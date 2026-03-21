@@ -1,3 +1,4 @@
+import { DEV_MODE } from '../../lib/dev-mode';
 import { api } from '../../lib/api';
 import { getLatestRevisionId } from '../../lib/google-apis';
 import { renderDocCard } from '../components/doc-card';
@@ -31,11 +32,13 @@ export async function renderDocumentsView(container: HTMLElement): Promise<void>
       if (!latestSignOff) continue;
 
       let hasChanged = false;
-      try {
-        const currentRevId = await getLatestRevisionId(docRef.id);
-        hasChanged = currentRevId !== latestSignOff.revisionId;
-      } catch {
-        // Can't check — assume unchanged
+      if (!DEV_MODE) {
+        try {
+          const currentRevId = await getLatestRevisionId(docRef.id);
+          hasChanged = currentRevId !== latestSignOff.revisionId;
+        } catch {
+          // Can't check — assume unchanged
+        }
       }
 
       let coSignerData = { count: 1, userIds: [] as string[] };
@@ -65,7 +68,9 @@ export async function renderDocumentsView(container: HTMLElement): Promise<void>
           diffModal.classList.remove('hidden');
           renderDiffViewer(diffBody, docRef.id, latestSignOff.revisionId);
         } else {
-          chrome.tabs.create({ url: `https://docs.google.com/document/d/${docRef.id}/edit` });
+          if (!DEV_MODE) {
+            chrome.tabs.create({ url: `https://docs.google.com/document/d/${docRef.id}/edit` });
+          }
         }
       });
       container.appendChild(card);

@@ -1,3 +1,4 @@
+import { DEV_MODE } from '../../lib/dev-mode';
 import { api } from '../../lib/api';
 import { signOut } from '../../lib/auth';
 import { loadThemePreference, saveThemePreference, resolveTheme, applyTheme, type ThemePreference } from '../../lib/theme';
@@ -57,7 +58,7 @@ export async function renderSettingsView(container: HTMLElement): Promise<void> 
 
   document.getElementById('upgrade-btn')?.addEventListener('click', async () => {
     const { url } = (await api.createCheckout('pro')) as { url: string };
-    chrome.tabs.create({ url });
+    if (!DEV_MODE) chrome.tabs.create({ url });
   });
 
   document.getElementById('manage-sigs-btn')?.addEventListener('click', () => {

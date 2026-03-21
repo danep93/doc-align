@@ -1,3 +1,4 @@
+import { DEV_MODE, devApi } from './dev-mode';
 import { getIdToken } from './auth';
 
 const API_BASE = 'http://localhost:8080/api';
@@ -29,7 +30,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json();
 }
 
-export const api = {
+const realApi = {
   getUser: () => request('/users/me'),
   getSignatures: () => request('/signatures'),
   createSignature: (data: object) =>
@@ -45,3 +46,5 @@ export const api = {
   createCheckout: (plan: string) =>
     request('/subscriptions/checkout', { method: 'POST', body: JSON.stringify({ plan }) }),
 };
+
+export const api = DEV_MODE ? devApi : realApi;

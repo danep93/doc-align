@@ -1,3 +1,4 @@
+import { DEV_MODE } from '../../lib/dev-mode';
 import { api } from '../../lib/api';
 import { getLatestRevisionId, insertImageIntoDoc } from '../../lib/google-apis';
 import { renderSignatureImage, computeImageHash } from '../../lib/signature-renderer';
@@ -62,7 +63,6 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
 
     try {
       const sig = signatures[0]!;
-      const revisionId = await getLatestRevisionId(docContext.docId);
 
       const imageDataUrl = await renderSignatureImage({
         drawingDataUrl: sig.drawingData,
@@ -75,7 +75,13 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
 
       const imageHash = await computeImageHash(imageDataUrl);
 
-      await insertImageIntoDoc(docContext.docId, imageDataUrl);
+      let revisionId: string;
+      if (DEV_MODE) {
+        revisionId = `rev_${Date.now()}`;
+      } else {
+        revisionId = await getLatestRevisionId(docContext.docId);
+        await insertImageIntoDoc(docContext.docId, imageDataUrl);
+      }
 
       await api.createSignOff({
         signatureId: sig.id,
@@ -96,6 +102,10 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
 }
 
 async function getDocContext(): Promise<DocContext | null> {
+  if (DEV_MODE) {
+    return { docId: 'dev-doc-123', title: 'Sample Product Requirements Doc' };
+  }
+
   return new Promise((resolve) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tab = tabs[0];
