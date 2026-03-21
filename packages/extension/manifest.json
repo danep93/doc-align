@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "doc-align",
+  "version": "0.1.0",
+  "description": "Sign off on Google Docs and track changes. Privacy-first document alignment.",
+  "permissions": ["storage", "identity", "activeTab"],
+  "host_permissions": ["https://docs.google.com/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://docs.google.com/document/*"],
+      "js": ["content/content.js"],
+      "css": ["content/content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "oauth2": {
+    "client_id": "YOUR_OAUTH_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/documents"
+    ]
+  }
+}

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>doc-align</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Auth gate -->
+    <div id="auth-screen" class="screen">
+      <div class="auth-container">
+        <h1 class="logo">doc-align</h1>
+        <p class="auth-subtitle">Sign off on documents.<br/>Track every change.</p>
+        <button id="sign-in-btn" class="btn btn-primary">Sign in with Google</button>
+      </div>
+    </div>
+
+    <!-- Main app -->
+    <div id="main-screen" class="screen hidden">
+      <!-- Header -->
+      <div class="header">
+        <span class="logo-sm">doc-align</span>
+        <span id="user-email" class="user-email"></span>
+        <span id="tier-badge" class="tier-badge">FREE</span>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab active" data-tab="signoff">Sign Off</button>
+        <button class="tab" data-tab="documents">My Documents</button>
+        <button class="tab" data-tab="settings">Settings</button>
+      </div>
+
+      <!-- Tab content -->
+      <div id="tab-signoff" class="tab-content active">
+        <div id="signoff-view"></div>
+      </div>
+      <div id="tab-documents" class="tab-content">
+        <div id="documents-view"></div>
+      </div>
+      <div id="tab-settings" class="tab-content">
+        <div id="settings-view"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modals -->
+  <div id="create-sig-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Create Signature</h2>
+        <button class="icon-btn modal-close">&times;</button>
+      </div>
+      <div class="modal-body" id="create-sig-body"></div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="create-sig-cancel">Cancel</button>
+        <button class="btn btn-primary" id="create-sig-save">Save Signature</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="diff-modal" class="modal-overlay hidden">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h2>Changes Since Sign-off</h2>
+        <button class="icon-btn modal-close">&times;</button>
+      </div>
+      <div class="modal-body" id="diff-body"></div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="diff-close">Close</button>
+        <button class="btn btn-primary" id="diff-resignoff">Re-Sign Off</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
