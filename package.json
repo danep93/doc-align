@@ -1,0 +1,17 @@
+{
+  "name": "doc-align",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sign-off and alignment platform for Google Docs",
+  "scripts": {
+    "build-all": "pnpm -r run build",
+    "test-all": "pnpm -r run test",
+    "typecheck": "pnpm -r run typecheck",
+    "clean": "pnpm -r run clean"
+  },
+  "engines": {
+    "node": ">=18",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.15.4"
+}

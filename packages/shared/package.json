@@ -1,0 +1,22 @@
+{
+  "name": "@doc-align/shared",
+  "version": "0.1.0",
+  "description": "Shared types, validation, and tier definitions for doc-align",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  },
+  "dependencies": {
+    "zod": "^3.23.0"
+  },
+  "files": ["dist"]
+}
