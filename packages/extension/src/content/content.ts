@@ -1,3 +1,5 @@
+import './content.css';
+
 // doc-align content script — runs on Google Docs pages
 console.log('doc-align content script loaded');
 
