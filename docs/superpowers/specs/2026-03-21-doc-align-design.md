@@ -117,9 +117,12 @@ doc-align/
 
 ### DocReference (lightweight doc pointer — no content)
 
+Stored as a subcollection under each user in Firestore (e.g., `users/{userId}/docReferences/{docId}`). Each user has their own set of doc references scoped to docs they have signed off on.
+
 ```typescript
 {
   id: string                  // Google Doc ID
+  userId: string              // Owner of this reference
   title: string               // Doc title (for display in extension popup)
   lastKnownRevisionId: string // Most recent revision we are aware of
   updatedAt: Timestamp
