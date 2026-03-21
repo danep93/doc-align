@@ -9,6 +9,7 @@
     "watch": "webpack --mode development --watch",
     "test": "vitest run",
     "test:watch": "vitest",
+    "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
