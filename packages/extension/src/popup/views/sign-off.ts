@@ -2,7 +2,10 @@ import { DEV_MODE } from '../../lib/dev-mode';
 import { api } from '../../lib/api';
 import { getLatestRevisionId, exportDocAsText, storeSnapshot } from '../../lib/google-apis';
 import { renderSignatureImage, computeImageHash } from '../../lib/signature-renderer';
-import type { Signature } from '@doc-align/shared';
+import { invalidateTab } from '../popup';
+import { ensureContentScript, getActiveDocTab } from '../../lib/inject-content-script';
+import { TIER_LIMITS } from '@doc-align/shared';
+import type { Signature, SignOff, UserProfile, Tier } from '@doc-align/shared';
 
 interface DocContext {
   docId: string;
@@ -21,7 +24,11 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
     return;
   }
 
-  const signatures = (await api.getSignatures()) as Signature[];
+  const [signatures, signOffs, profile] = await Promise.all([
+    api.getSignatures() as Promise<Signature[]>,
+    api.getSignOffs() as Promise<SignOff[]>,
+    api.getUser() as Promise<UserProfile>,
+  ]);
 
   if (signatures.length === 0) {
     container.innerHTML = `
@@ -36,13 +43,28 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
     return;
   }
 
+  const tier = profile.tier as Tier;
+  const isPremium = TIER_LIMITS[tier].maxCheckpointsPerDoc > 1;
+  const existingForDoc = signOffs.filter((so) => so.documentId === docContext.docId);
+  const alreadySigned = existingForDoc.length > 0;
+
+  // Determine button text
+  let buttonText: string;
+  if (!alreadySigned) {
+    buttonText = 'Sign This Doc';
+  } else if (isPremium) {
+    buttonText = 'Add Another Signature';
+  } else {
+    buttonText = 'Re-Sign This Doc';
+  }
+
   container.innerHTML = `
     <div style="margin-bottom:12px;">
-      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Current Document</div>
+      <div style="font-size:11px;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:0.5px;">Current Document</div>
       <div style="font-size:14px;font-weight:500;margin-top:4px;">${escapeHtml(docContext.title)}</div>
     </div>
     <div style="margin-bottom:12px;">
-      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Your Signature</div>
+      <div style="font-size:11px;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Your Signature</div>
       <div id="active-sig-preview" class="sig-card">
         <div class="sig-card-preview">
           <img src="${signatures[0]!.drawingData}" alt="Signature" />
@@ -53,102 +75,159 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
         </div>
       </div>
     </div>
-    <button class="btn btn-primary" id="sign-off-btn" style="width:100%;">Sign Off on This Document</button>
+    <div id="signoff-action-area">
+      <button class="btn btn-primary" id="sign-off-btn" style="width:100%;">${buttonText}</button>
+    </div>
   `;
 
-  document.getElementById('sign-off-btn')?.addEventListener('click', async () => {
-    const btn = document.getElementById('sign-off-btn') as HTMLButtonElement;
-    btn.disabled = true;
-    btn.textContent = 'Signing off...';
-
-    try {
-      const sig = signatures[0]!;
-
-      const now = new Date();
-      const dateTimeStr = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-      const imageDataUrl = await renderSignatureImage({
-        drawingDataUrl: sig.drawingData,
-        name: sig.name,
-        date: dateTimeStr,
-        title: sig.title,
-        organization: sig.organization,
-        format: sig.format,
-      });
-
-      const imageHash = await computeImageHash(imageDataUrl);
-
-      let revisionId: string;
-      if (DEV_MODE) {
-        // Use document text hash as revision ID for change detection
-        revisionId = await getDocTextHash();
-      } else {
-        revisionId = await getLatestRevisionId(docContext.docId);
-        // Store text snapshot for later diff comparison
-        const docText = await exportDocAsText(docContext.docId);
-        await storeSnapshot(docContext.docId, revisionId, docText);
-        console.log(`[doc-align] Snapshot stored: doc=${docContext.docId}, rev=${revisionId}, length=${docText.length}`);
-      }
-
-      // Copy signature image to clipboard for user to paste
-      await copyImageToClipboard(imageDataUrl);
-      showToast('Signature copied to clipboard — paste it into your doc (⌘V)');
-
-      await api.createSignOff({
-        signatureId: sig.id,
-        documentId: docContext.docId,
-        revisionId,
-        imageHash,
-        documentTitle: docContext.title,
-      });
-
-      btn.textContent = 'Signed! Paste into doc (⌘V)';
-      btn.style.background = 'var(--color-success)';
-    } catch (err) {
-      btn.disabled = false;
-      btn.textContent = 'Sign Off on This Document';
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error('Sign-off error:', err);
-      alert(`Failed to sign off: ${msg}`);
+  document.getElementById('sign-off-btn')?.addEventListener('click', () => {
+    if (alreadySigned && !isPremium) {
+      // Free user re-signing — show inline confirmation
+      showReSignConfirmation(container, docContext, signatures[0]!);
+    } else {
+      // First sign-off or premium user — just do it
+      executeSignOff(docContext, signatures[0]!);
     }
   });
+}
 
+function showReSignConfirmation(container: HTMLElement, docContext: DocContext, sig: Signature): void {
+  const actionArea = document.getElementById('signoff-action-area');
+  if (!actionArea) return;
+
+  actionArea.innerHTML = `
+    <div class="resignoff-confirm">
+      <div class="resignoff-confirm-warning">
+        <div style="font-weight:600;margin-bottom:6px;">Reset your sign-off?</div>
+        <div style="font-size:12px;color:var(--color-text-secondary);line-height:1.5;">
+          This will reset your change tracking for this document. Your previous diff history will be permanently deleted.
+        </div>
+        <div style="font-size:12px;margin-top:8px;">
+          <a href="#" id="upgrade-hint" style="color:var(--color-accent);text-decoration:none;">Upgrade to Pro</a> for sign-off history — keep up to 10 checkpoints per document.
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="btn btn-ghost" id="resign-cancel" style="flex:1;">Cancel</button>
+        <button class="btn btn-danger" id="resign-confirm" style="flex:1;">Reset Sign-off</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('resign-cancel')?.addEventListener('click', () => {
+    // Restore original button
+    actionArea.innerHTML = `
+      <button class="btn btn-primary" id="sign-off-btn" style="width:100%;">Re-Sign This Doc</button>
+    `;
+    document.getElementById('sign-off-btn')?.addEventListener('click', () => {
+      showReSignConfirmation(container, docContext, sig);
+    });
+  });
+
+  document.getElementById('resign-confirm')?.addEventListener('click', () => {
+    const btn = document.getElementById('resign-confirm') as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = 'Resetting...';
+    executeSignOff(docContext, sig);
+  });
+
+  document.getElementById('upgrade-hint')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    // Switch to settings tab and trigger upgrade
+    document.querySelector('.tab[data-tab="settings"]')?.dispatchEvent(new Event('click'));
+  });
+}
+
+async function executeSignOff(docContext: DocContext, sig: Signature): Promise<void> {
+  try {
+    const now = new Date();
+    const dateTimeStr = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    const imageDataUrl = await renderSignatureImage({
+      drawingDataUrl: sig.drawingData,
+      name: sig.name,
+      date: dateTimeStr,
+      title: sig.title,
+      organization: sig.organization,
+      format: sig.format,
+    });
+
+    const imageHash = await computeImageHash(imageDataUrl);
+
+    let revisionId: string;
+    if (DEV_MODE) {
+      revisionId = await getDocTextHash();
+    } else {
+      revisionId = await getLatestRevisionId(docContext.docId);
+      const docText = await exportDocAsText(docContext.docId);
+      await storeSnapshot(docContext.docId, revisionId, docText);
+    }
+
+    await copyImageToClipboard(imageDataUrl);
+    showToast('Signature copied to clipboard — paste it into your doc (⌘V)');
+
+    await api.createSignOff({
+      signatureId: sig.id,
+      documentId: docContext.docId,
+      revisionId,
+      imageHash,
+      documentTitle: docContext.title,
+    });
+
+    // Update the action area to show success
+    const actionArea = document.getElementById('signoff-action-area');
+    if (actionArea) {
+      actionArea.innerHTML = `
+        <button class="btn btn-primary" id="sign-off-btn" style="width:100%;background:var(--color-success);border-color:var(--color-success);" disabled>
+          Signed! Paste into doc (⌘V)
+        </button>
+      `;
+    }
+
+    invalidateTab('documents');
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Sign-off error:', err);
+    showToast(`Failed to sign off: ${msg}`);
+
+    // Restore button
+    const actionArea = document.getElementById('signoff-action-area');
+    if (actionArea) {
+      actionArea.innerHTML = `
+        <button class="btn btn-primary" id="sign-off-btn" style="width:100%;">Sign This Doc</button>
+      `;
+    }
+  }
 }
 
 async function getDocContext(): Promise<DocContext | null> {
-  // Always get real doc context from the active tab's content script
+  const tab = await getActiveDocTab();
+  if (!tab) return null;
+
+  await ensureContentScript(tab.tabId);
+
   return new Promise((resolve) => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tab = tabs[0];
-      if (!tab?.id || !tab.url?.includes('docs.google.com/document')) {
+    chrome.tabs.sendMessage(tab.tabId, { type: 'GET_DOC_INFO' }, (response) => {
+      if (chrome.runtime.lastError || !response?.docId) {
         resolve(null);
         return;
       }
-      chrome.tabs.sendMessage(tab.id, { type: 'GET_DOC_INFO' }, (response) => {
-        if (chrome.runtime.lastError || !response?.docId) {
-          resolve(null);
-          return;
-        }
-        resolve({ docId: response.docId, title: response.title });
-      });
+      resolve({ docId: response.docId, title: response.title });
     });
   });
 }
 
 async function getDocTextHash(): Promise<string> {
+  const tab = await getActiveDocTab();
+  if (!tab) throw new Error('No active Google Doc tab');
+
+  await ensureContentScript(tab.tabId);
+
   return new Promise((resolve, reject) => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tab = tabs[0];
-      if (!tab?.id) {
-        reject(new Error('No active tab'));
+    chrome.tabs.sendMessage(tab.tabId, { type: 'GET_DOC_TEXT_HASH' }, (response) => {
+      if (chrome.runtime.lastError || !response?.hash) {
+        reject(new Error('Failed to get doc text hash'));
         return;
       }
-      chrome.tabs.sendMessage(tab.id, { type: 'GET_DOC_TEXT_HASH' }, (response) => {
-        if (chrome.runtime.lastError || !response?.hash) {
-          reject(new Error('Failed to get doc text hash'));
-          return;
-        }
-        resolve(response.hash);
-      });
+      resolve(response.hash);
     });
   });
 }
@@ -171,7 +250,6 @@ function showToast(message: string, duration = 3000): void {
   toast.textContent = message;
   document.body.appendChild(toast);
 
-  // Trigger animation
   requestAnimationFrame(() => toast.classList.add('da-toast-visible'));
 
   setTimeout(() => {
