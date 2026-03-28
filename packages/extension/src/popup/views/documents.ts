@@ -4,25 +4,59 @@ import { getLatestRevisionId, exportDocAsText, storeSnapshot } from '../../lib/g
 import { renderDocCard } from '../components/doc-card';
 import { renderDiffViewerWithCheckpoints } from '../components/diff-viewer';
 import { renderSignatureImage, computeImageHash } from '../../lib/signature-renderer';
+import { ensureContentScript, getActiveDocTab } from '../../lib/inject-content-script';
 import { TIER_LIMITS } from '@doc-align/shared';
 import type { SignOff, DocReference, DocSignOffSummary, UserProfile, Signature, Tier } from '@doc-align/shared';
 
-// Get text hash from the content script of a tab with the given doc ID
-async function getDocTextHash(docId: string): Promise<string | null> {
+async function refreshDocTitles(docRefs: DocReference[]): Promise<void> {
+  const tab = await getActiveDocTab();
+  if (!tab) return;
+
+  for (const docRef of docRefs) {
+    if (tab.url.includes(`docs.google.com/document/d/${docRef.id}`)) {
+      const currentTitle = tab.title.replace(' - Google Docs', '').trim();
+      if (currentTitle && currentTitle !== docRef.title) {
+        docRef.title = currentTitle;
+        await updateDocRefTitle(docRef.id, currentTitle);
+      }
+      break;
+    }
+  }
+}
+
+async function updateDocRefTitle(docId: string, newTitle: string): Promise<void> {
   return new Promise((resolve) => {
-    chrome.tabs.query({ url: `https://docs.google.com/document/d/${docId}/*` }, (tabs) => {
-      const tab = tabs[0];
-      if (!tab?.id) {
+    chrome.storage.local.get('local_docrefs', (result) => {
+      const refs = (result.local_docrefs || []) as DocReference[];
+      const ref = refs.find((r) => r.id === docId);
+      if (ref) {
+        ref.title = newTitle;
+        ref.updatedAt = new Date().toISOString();
+        chrome.storage.local.set({ local_docrefs: refs }, resolve);
+      } else {
+        resolve();
+      }
+    });
+  });
+}
+
+// Get text hash from the content script of a tab with the given doc ID.
+// Only works in DEV_MODE, and only if the doc is the currently active tab.
+async function getDocTextHash(docId: string): Promise<string | null> {
+  if (!DEV_MODE) return null;
+
+  const tab = await getActiveDocTab();
+  if (!tab || !tab.url.includes(`docs.google.com/document/d/${docId}`)) return null;
+
+  await ensureContentScript(tab.tabId);
+
+  return new Promise((resolve) => {
+    chrome.tabs.sendMessage(tab.tabId, { type: 'GET_DOC_TEXT_HASH' }, (response) => {
+      if (chrome.runtime.lastError || !response?.hash) {
         resolve(null);
         return;
       }
-      chrome.tabs.sendMessage(tab.id, { type: 'GET_DOC_TEXT_HASH' }, (response) => {
-        if (chrome.runtime.lastError || !response?.hash) {
-          resolve(null);
-          return;
-        }
-        resolve(response.hash);
-      });
+      resolve(response.hash);
     });
   });
 }
@@ -259,6 +293,9 @@ export async function renderDocumentsView(container: HTMLElement): Promise<void>
       chrome.tabs.create({ url: extUrl });
     });
     container.appendChild(openTabBtn);
+
+    // Refresh doc titles from any open tabs
+    await refreshDocTitles(docRefs);
 
     for (const docRef of docRefs) {
       const mySignOffs = signOffs

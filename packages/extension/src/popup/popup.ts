@@ -11,7 +11,10 @@ import type { UserProfile } from '@doc-align/shared';
 // Init theme
 initTheme();
 
-// Tab switching
+// Track which tabs have been rendered
+const renderedTabs = new Set<string>();
+
+// Tab switching — only render on first visit
 document.querySelectorAll('.tab').forEach((tab) => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
@@ -20,12 +23,23 @@ document.querySelectorAll('.tab').forEach((tab) => {
     const target = (tab as HTMLElement).dataset.tab;
     document.getElementById(`tab-${target}`)?.classList.add('active');
 
-    // Lazy-load tab content
-    if (target === 'signoff') renderSignOffView(document.getElementById('signoff-view')!);
-    if (target === 'documents') renderDocumentsView(document.getElementById('documents-view')!);
-    if (target === 'settings') renderSettingsView(document.getElementById('settings-view')!);
+    if (!renderedTabs.has(target || '')) {
+      renderTab(target || '');
+    }
   });
 });
+
+function renderTab(target: string): void {
+  renderedTabs.add(target);
+  if (target === 'signoff') renderSignOffView(document.getElementById('signoff-view')!);
+  if (target === 'documents') renderDocumentsView(document.getElementById('documents-view')!);
+  if (target === 'settings') renderSettingsView(document.getElementById('settings-view')!);
+}
+
+// Force re-render a tab (e.g., after sign-off changes data)
+export function invalidateTab(target: string): void {
+  renderedTabs.delete(target);
+}
 
 // Modal close handlers
 document.querySelectorAll('.modal-close').forEach((btn) => {
@@ -65,16 +79,21 @@ onAuthChange(async (user) => {
       badge.className = `tier-badge ${profile.tier}`;
 
       initCreateSignatureModal(profile.tier, () => {
-        renderSignOffView(document.getElementById('signoff-view')!);
+        invalidateTab('signoff');
+        renderTab('signoff');
       });
     } catch {
       // Continue without tier info — init modal with free tier
       initCreateSignatureModal('free', () => {
-        renderSignOffView(document.getElementById('signoff-view')!);
+        invalidateTab('signoff');
+        renderTab('signoff');
       });
     }
 
-    renderSignOffView(document.getElementById('signoff-view')!);
+    // Preload all tabs so switching is instant
+    renderTab('signoff');
+    renderTab('documents');
+    renderTab('settings');
   } else if (!authResolved) {
     // First null callback — wait a moment for Firebase to restore session
     setTimeout(() => {
