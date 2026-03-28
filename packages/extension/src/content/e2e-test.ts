@@ -9,7 +9,7 @@ window.addEventListener('message', async (event) => {
     let result: unknown;
 
     if (type === 'DA_E2E_SIGN_OFF') {
-      const docId = extractDocId(window.location.href);
+      const docId = e2eExtractDocId(window.location.href);
       const title = document.title.replace(' - Google Docs', '').trim();
       if (!docId) throw new Error('Not on a Google Doc');
 
@@ -76,7 +76,7 @@ window.addEventListener('message', async (event) => {
       result = { success: true, revisionId, snapshotLength: docText.length, title };
 
     } else if (type === 'DA_E2E_CHECK_CHANGES') {
-      const docId = extractDocId(window.location.href);
+      const docId = e2eExtractDocId(window.location.href);
       if (!docId) throw new Error('Not on a Google Doc');
 
       const token = await bgMessage({ type: 'GET_AUTH_TOKEN' });
@@ -102,7 +102,7 @@ window.addEventListener('message', async (event) => {
       };
 
     } else if (type === 'DA_E2E_GET_DIFF') {
-      const docId = extractDocId(window.location.href);
+      const docId = e2eExtractDocId(window.location.href);
       if (!docId) throw new Error('Not on a Google Doc');
 
       const token = await bgMessage({ type: 'GET_AUTH_TOKEN' });
@@ -151,7 +151,7 @@ window.addEventListener('message', async (event) => {
       result = { cleared: true };
 
     } else if (type === 'DA_E2E_STATUS') {
-      const docId = extractDocId(window.location.href);
+      const docId = e2eExtractDocId(window.location.href);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const signOffs: any[] = (await chromeStorageGet('local_signoffs')) || [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -168,7 +168,7 @@ window.addEventListener('message', async (event) => {
   }
 });
 
-function extractDocId(url: string): string | null {
+function e2eExtractDocId(url: string): string | null {
   const match = url.match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
   return match ? (match[1] ?? null) : null;
 }
