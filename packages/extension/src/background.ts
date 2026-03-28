@@ -13,4 +13,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     });
     return true; // async response
   }
+
+  if (message.type === 'RELOAD_EXTENSION') {
+    sendResponse({ ok: true });
+    // Small delay so the response gets sent before reload
+    setTimeout(() => chrome.runtime.reload(), 100);
+    return true;
+  }
 });

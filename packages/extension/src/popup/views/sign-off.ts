@@ -1,6 +1,6 @@
 import { DEV_MODE } from '../../lib/dev-mode';
 import { api } from '../../lib/api';
-import { getLatestRevisionId, insertImageIntoDoc } from '../../lib/google-apis';
+import { getLatestRevisionId, exportDocAsText, storeSnapshot } from '../../lib/google-apis';
 import { renderSignatureImage, computeImageHash } from '../../lib/signature-renderer';
 import type { Signature } from '@doc-align/shared';
 
@@ -64,10 +64,12 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
     try {
       const sig = signatures[0]!;
 
+      const now = new Date();
+      const dateTimeStr = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
       const imageDataUrl = await renderSignatureImage({
         drawingDataUrl: sig.drawingData,
         name: sig.name,
-        date: new Date().toLocaleDateString(),
+        date: dateTimeStr,
         title: sig.title,
         organization: sig.organization,
         format: sig.format,
@@ -77,11 +79,19 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
 
       let revisionId: string;
       if (DEV_MODE) {
-        revisionId = `rev_${Date.now()}`;
+        // Use document text hash as revision ID for change detection
+        revisionId = await getDocTextHash();
       } else {
         revisionId = await getLatestRevisionId(docContext.docId);
-        await insertImageIntoDoc(docContext.docId, imageDataUrl);
+        // Store text snapshot for later diff comparison
+        const docText = await exportDocAsText(docContext.docId);
+        await storeSnapshot(docContext.docId, revisionId, docText);
+        console.log(`[doc-align] Snapshot stored: doc=${docContext.docId}, rev=${revisionId}, length=${docText.length}`);
       }
+
+      // Copy signature image to clipboard for user to paste
+      await copyImageToClipboard(imageDataUrl);
+      showToast('Signature copied to clipboard — paste it into your doc (⌘V)');
 
       await api.createSignOff({
         signatureId: sig.id,
@@ -91,21 +101,21 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
         documentTitle: docContext.title,
       });
 
-      btn.textContent = 'Signed Off!';
-      btn.style.background = 'var(--green)';
+      btn.textContent = 'Signed! Paste into doc (⌘V)';
+      btn.style.background = 'var(--color-success)';
     } catch (err) {
       btn.disabled = false;
       btn.textContent = 'Sign Off on This Document';
-      alert('Failed to sign off. Please try again.');
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('Sign-off error:', err);
+      alert(`Failed to sign off: ${msg}`);
     }
   });
+
 }
 
 async function getDocContext(): Promise<DocContext | null> {
-  if (DEV_MODE) {
-    return { docId: 'dev-doc-123', title: 'Sample Product Requirements Doc' };
-  }
-
+  // Always get real doc context from the active tab's content script
   return new Promise((resolve) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tab = tabs[0];
@@ -122,6 +132,52 @@ async function getDocContext(): Promise<DocContext | null> {
       });
     });
   });
+}
+
+async function getDocTextHash(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs[0];
+      if (!tab?.id) {
+        reject(new Error('No active tab'));
+        return;
+      }
+      chrome.tabs.sendMessage(tab.id, { type: 'GET_DOC_TEXT_HASH' }, (response) => {
+        if (chrome.runtime.lastError || !response?.hash) {
+          reject(new Error('Failed to get doc text hash'));
+          return;
+        }
+        resolve(response.hash);
+      });
+    });
+  });
+}
+
+async function copyImageToClipboard(dataUrl: string): Promise<void> {
+  const base64 = dataUrl.split(',')[1] || '';
+  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  const blob = new Blob([bytes], { type: 'image/png' });
+  await navigator.clipboard.write([
+    new ClipboardItem({ 'image/png': blob }),
+  ]);
+}
+
+function showToast(message: string, duration = 3000): void {
+  const existing = document.querySelector('.da-toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.className = 'da-toast';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+
+  // Trigger animation
+  requestAnimationFrame(() => toast.classList.add('da-toast-visible'));
+
+  setTimeout(() => {
+    toast.classList.remove('da-toast-visible');
+    toast.addEventListener('transitionend', () => toast.remove());
+  }, duration);
 }
 
 function escapeHtml(text: string): string {

@@ -2,7 +2,7 @@ import './popup.css';
 import { signIn, onAuthChange } from '../lib/auth';
 import { initTheme } from '../lib/theme';
 import { renderSignOffView } from './views/sign-off';
-import { renderDocumentsView } from './views/documents';
+import { renderDocumentsView, handleReSignOff } from './views/documents';
 import { renderSettingsView } from './views/settings';
 import { initCreateSignatureModal } from './components/create-signature-modal';
 import { api } from '../lib/api';
@@ -39,12 +39,19 @@ document.getElementById('diff-close')?.addEventListener('click', () => {
   document.getElementById('diff-modal')?.classList.add('hidden');
 });
 
-// Auth state
+// Re-Sign Off button in diff modal
+document.getElementById('diff-resignoff')?.addEventListener('click', () => {
+  handleReSignOff();
+});
+
+// Auth state — wait briefly for Firebase to restore persisted session
+let authResolved = false;
 onAuthChange(async (user) => {
   const authScreen = document.getElementById('auth-screen')!;
   const mainScreen = document.getElementById('main-screen')!;
 
   if (user) {
+    authResolved = true;
     authScreen.classList.add('hidden');
     mainScreen.classList.remove('hidden');
 
@@ -61,11 +68,23 @@ onAuthChange(async (user) => {
         renderSignOffView(document.getElementById('signoff-view')!);
       });
     } catch {
-      // Continue without tier info
+      // Continue without tier info — init modal with free tier
+      initCreateSignatureModal('free', () => {
+        renderSignOffView(document.getElementById('signoff-view')!);
+      });
     }
 
     renderSignOffView(document.getElementById('signoff-view')!);
+  } else if (!authResolved) {
+    // First null callback — wait a moment for Firebase to restore session
+    setTimeout(() => {
+      if (!authResolved) {
+        authScreen.classList.remove('hidden');
+        mainScreen.classList.add('hidden');
+      }
+    }, 500);
   } else {
+    // User actually signed out
     authScreen.classList.remove('hidden');
     mainScreen.classList.add('hidden');
   }
@@ -76,6 +95,8 @@ document.getElementById('sign-in-btn')?.addEventListener('click', async () => {
   try {
     await signIn();
   } catch (err) {
-    alert('Sign-in failed. Please try again.');
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Sign-in error:', err);
+    alert(`Sign-in failed: ${msg}`);
   }
 });

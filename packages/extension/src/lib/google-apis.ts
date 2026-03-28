@@ -37,7 +37,11 @@ export async function listRevisions(docId: string): Promise<Revision[]> {
     `https://www.googleapis.com/drive/v3/files/${docId}/revisions?fields=revisions(id,modifiedTime)`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
-  if (!res.ok) throw new Error('Failed to list revisions');
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    console.error(`listRevisions failed: ${res.status}`, body);
+    throw new Error(`Failed to list revisions: ${res.status} ${body}`);
+  }
   const data = await res.json();
   return data.revisions || [];
 }
@@ -49,13 +53,64 @@ export async function getLatestRevisionId(docId: string): Promise<string> {
 }
 
 export async function getRevisionContent(docId: string, revisionId: string): Promise<string> {
+  // For 'head', export the current document as plain text
+  if (revisionId === 'head') {
+    return exportDocAsText(docId);
+  }
+
+  // Always try stored snapshot first (most reliable for Google Docs)
+  const snapshot = await getStoredSnapshot(docId, revisionId);
+  if (snapshot) return snapshot;
+
+  // Fall back to Drive API (works for non-Google-Docs files)
+  try {
+    const token = await getGoogleToken();
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${docId}/revisions/${revisionId}?alt=media`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (res.ok) return res.text();
+  } catch {
+    // API failed — snapshot is the only option
+  }
+
+  throw new Error(`No snapshot found for this sign-off. Please re-sign-off on the document to enable diffs.`);
+}
+
+export async function exportDocAsText(docId: string): Promise<string> {
   const token = await getGoogleToken();
   const res = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${docId}/revisions/${revisionId}?alt=media`,
+    `https://www.googleapis.com/drive/v3/files/${docId}/export?mimeType=text/plain`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
-  if (!res.ok) throw new Error('Failed to get revision content');
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Failed to export document: ${res.status} ${body}`);
+  }
   return res.text();
+}
+
+export async function storeSnapshot(docId: string, revisionId: string, text: string): Promise<void> {
+  const key = `snapshot_${docId}_${revisionId}`;
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ [key]: text }, resolve);
+  });
+}
+
+export async function deleteSnapshot(docId: string, revisionId: string): Promise<void> {
+  const key = `snapshot_${docId}_${revisionId}`;
+  return new Promise((resolve) => {
+    chrome.storage.local.remove(key, resolve);
+  });
+}
+
+async function getStoredSnapshot(docId: string, revisionId: string): Promise<string | null> {
+  const key = `snapshot_${docId}_${revisionId}`;
+  return new Promise((resolve) => {
+    chrome.storage.local.get(key, (result) => {
+      resolve((result[key] as string) ?? null);
+    });
+  });
 }
 
 export async function insertImageIntoDoc(docId: string, imageDataUrl: string): Promise<void> {

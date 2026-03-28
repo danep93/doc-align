@@ -9,6 +9,7 @@ module.exports = (env, argv) => {
       background: './src/background.ts',
       'popup/popup': './src/popup/popup.ts',
       'content/content': './src/content/content.ts',
+      'content/e2e-test': './src/content/e2e-test.ts',
     },
     output: {
       path: path.resolve(__dirname, 'dist'),

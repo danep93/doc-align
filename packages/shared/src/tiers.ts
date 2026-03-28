@@ -3,6 +3,7 @@ import type { Tier } from './types';
 export interface TierLimits {
   maxSignOffsPerMonth: number;
   maxTrackedDocuments: number;
+  maxCheckpointsPerDoc: number;
   signatureFormat: 'basic' | 'full';
   richDiffViewer: boolean;
   auditRetentionDays: number;
@@ -12,6 +13,7 @@ export const TIER_LIMITS: Record<Tier, TierLimits> = {
   free: {
     maxSignOffsPerMonth: 10,
     maxTrackedDocuments: 5,
+    maxCheckpointsPerDoc: 1,
     signatureFormat: 'basic',
     richDiffViewer: false,
     auditRetentionDays: 7,
@@ -19,6 +21,7 @@ export const TIER_LIMITS: Record<Tier, TierLimits> = {
   pro: {
     maxSignOffsPerMonth: Infinity,
     maxTrackedDocuments: Infinity,
+    maxCheckpointsPerDoc: 10,
     signatureFormat: 'full',
     richDiffViewer: true,
     auditRetentionDays: 90,
@@ -26,6 +29,7 @@ export const TIER_LIMITS: Record<Tier, TierLimits> = {
   enterprise: {
     maxSignOffsPerMonth: Infinity,
     maxTrackedDocuments: Infinity,
+    maxCheckpointsPerDoc: 10,
     signatureFormat: 'full',
     richDiffViewer: true,
     auditRetentionDays: 365,

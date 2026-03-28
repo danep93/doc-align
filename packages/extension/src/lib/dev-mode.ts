@@ -1,14 +1,8 @@
-// Dev mode: set to true to bypass Firebase auth and use in-memory API stubs
-export const DEV_MODE = true;
+// Dev mode: set to true to bypass Firebase auth and use local storage stubs
+export const DEV_MODE = false;
 
 import type { Signature, SignOff, DocReference, UserProfile } from '@doc-align/shared';
-
-// In-memory stores
-const signatures: Signature[] = [];
-const signOffs: SignOff[] = [];
-const docRefs: DocReference[] = [];
-
-let signOffCounter = 0;
+import { TIER_LIMITS } from '@doc-align/shared';
 
 const devUser: UserProfile = {
   id: 'dev-user-1',
@@ -27,12 +21,32 @@ export const devFakeUser = {
   getIdToken: async () => 'dev-token',
 };
 
+// --- chrome.storage.local helpers for persistence across popup opens ---
+
+async function loadStore<T>(key: string, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(key, (result) => {
+      resolve((result[key] as T) ?? fallback);
+    });
+  });
+}
+
+async function saveStore<T>(key: string, value: T): Promise<void> {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ [key]: value }, resolve);
+  });
+}
+
 export const devApi = {
   getUser: async () => devUser,
 
-  getSignatures: async () => signatures.filter((s) => s.status === 'active'),
+  getSignatures: async () => {
+    const sigs = await loadStore<Signature[]>('dev_signatures', []);
+    return sigs.filter((s) => s.status === 'active');
+  },
 
   createSignature: async (data: Record<string, unknown>) => {
+    const sigs = await loadStore<Signature[]>('dev_signatures', []);
     const sig: Signature = {
       id: `sig_${Date.now()}`,
       userId: devUser.id,
@@ -44,31 +58,65 @@ export const devApi = {
       createdAt: new Date().toISOString(),
       status: 'active',
     };
-    signatures.push(sig);
+    sigs.push(sig);
+    await saveStore('dev_signatures', sigs);
     return sig;
   },
 
   retireSignature: async (id: string) => {
-    const sig = signatures.find((s) => s.id === id);
+    const sigs = await loadStore<Signature[]>('dev_signatures', []);
+    const sig = sigs.find((s) => s.id === id);
     if (sig) sig.status = 'retired';
+    await saveStore('dev_signatures', sigs);
     return { success: true };
   },
 
-  getSignOffs: async () => signOffs,
+  getSignOffs: async () => loadStore<SignOff[]>('dev_signoffs', []),
 
-  getDocuments: async () => docRefs,
+  getSignOffsForDoc: async (docId: string) => {
+    const signOffs = await loadStore<SignOff[]>('dev_signoffs', []);
+    return signOffs
+      .filter((so) => so.documentId === docId && so.userId === devUser.id)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  },
+
+  getDocuments: async () => loadStore<DocReference[]>('dev_docrefs', []),
 
   createSignOff: async (data: Record<string, unknown>) => {
+    const signOffs = await loadStore<SignOff[]>('dev_signoffs', []);
+    const docRefs = await loadStore<DocReference[]>('dev_docrefs', []);
+    const counter = await loadStore<number>('dev_signoff_counter', 0);
+
+    const tier = devUser.tier;
+    const maxCheckpoints = TIER_LIMITS[tier].maxCheckpointsPerDoc;
+    const docId = data.documentId as string;
+
+    // Get existing sign-offs for this doc, sorted oldest first
+    const existingForDoc = signOffs
+      .filter((so) => so.documentId === docId && so.userId === devUser.id)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+    // Prune oldest if at or over limit
+    const toRemoveIds = new Set<string>();
+    while (existingForDoc.length >= maxCheckpoints) {
+      const oldest = existingForDoc.shift()!;
+      toRemoveIds.add(oldest.id);
+      // Remove snapshot
+      const snapshotKey = `snapshot_${oldest.documentId}_${oldest.revisionId}`;
+      await new Promise<void>((resolve) => chrome.storage.local.remove(snapshotKey, resolve));
+    }
+    const filteredSignOffs = signOffs.filter((so) => !toRemoveIds.has(so.id));
+
     const so: SignOff = {
-      id: `so_${++signOffCounter}`,
+      id: `so_${counter + 1}`,
       userId: devUser.id,
       signatureId: data.signatureId as string,
-      documentId: data.documentId as string,
+      documentId: docId,
       revisionId: data.revisionId as string,
       imageHash: data.imageHash as string,
       createdAt: new Date().toISOString(),
     };
-    signOffs.push(so);
+    filteredSignOffs.push(so);
 
     // Upsert doc reference
     const existingIdx = docRefs.findIndex((d) => d.id === so.documentId);
@@ -85,8 +133,22 @@ export const devApi = {
       docRefs.push(ref);
     }
 
-    devUser.signOffCount++;
+    await saveStore('dev_signoffs', filteredSignOffs);
+    await saveStore('dev_docrefs', docRefs);
+    await saveStore('dev_signoff_counter', counter + 1);
     return so;
+  },
+
+  deleteSignOff: async (signOffId: string) => {
+    const signOffs = await loadStore<SignOff[]>('dev_signoffs', []);
+    const toDelete = signOffs.find((so) => so.id === signOffId);
+    if (toDelete) {
+      const snapshotKey = `snapshot_${toDelete.documentId}_${toDelete.revisionId}`;
+      await new Promise<void>((resolve) => chrome.storage.local.remove(snapshotKey, resolve));
+    }
+    const filtered = signOffs.filter((so) => so.id !== signOffId);
+    await saveStore('dev_signoffs', filtered);
+    return { success: true };
   },
 
   getCoSigners: async (_docId: string, _revId: string) => ({

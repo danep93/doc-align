@@ -7,14 +7,18 @@ import type { UserProfile } from '@doc-align/shared';
 export async function renderSettingsView(container: HTMLElement): Promise<void> {
   const user = (await api.getUser()) as UserProfile;
   const currentTheme = await loadThemePreference();
+  const existingSigs = await api.getSignatures();
+  const hasSignature = Array.isArray(existingSigs) && existingSigs.length > 0;
+  // If stored as 'system', default to 'dark'
+  const effectiveTheme = currentTheme === 'system' ? 'dark' : currentTheme;
 
   container.innerHTML = `
     <div style="margin-bottom:16px;">
       <div class="form-label">Account</div>
-      <div style="padding:10px 12px;background:var(--bg-surface);border-radius:var(--radius);font-size:13px;">
+      <div style="padding:10px 12px;background:var(--color-surface-2);border-radius:var(--radius-md);font-size:13px;">
         <div>${escapeHtml(user.email)}</div>
-        <div style="font-size:11px;color:var(--text-sec);margin-top:4px;">
-          ${user.tier.toUpperCase()} plan · ${user.signOffCount} sign-offs this month
+        <div style="font-size:11px;color:var(--color-text-secondary);margin-top:4px;">
+          ${user.tier.toUpperCase()} plan
         </div>
       </div>
     </div>
@@ -28,20 +32,19 @@ export async function renderSettingsView(container: HTMLElement): Promise<void> 
     <div style="margin-bottom:16px;">
       <div class="form-label">Signatures</div>
       <button class="btn btn-ghost" id="manage-sigs-btn" style="width:100%;">
-        Create New Signature
+        ${hasSignature ? 'Change Signature' : 'Create New Signature'}
       </button>
     </div>
 
     <div style="margin-bottom:16px;">
       <div class="form-label">Theme</div>
       <div style="display:flex;gap:6px;">
-        <button class="btn btn-ghost theme-btn ${currentTheme === 'system' ? 'active' : ''}" data-theme="system" style="flex:1;font-size:11px;">System</button>
-        <button class="btn btn-ghost theme-btn ${currentTheme === 'dark' ? 'active' : ''}" data-theme="dark" style="flex:1;font-size:11px;">Dark</button>
-        <button class="btn btn-ghost theme-btn ${currentTheme === 'light' ? 'active' : ''}" data-theme="light" style="flex:1;font-size:11px;">Light</button>
+        <button class="btn btn-ghost theme-btn ${effectiveTheme === 'dark' ? 'theme-btn-selected' : ''}" data-theme="dark" style="flex:1;font-size:11px;">Dark</button>
+        <button class="btn btn-ghost theme-btn ${effectiveTheme === 'light' ? 'theme-btn-selected' : ''}" data-theme="light" style="flex:1;font-size:11px;">Light</button>
       </div>
     </div>
 
-    <button class="btn btn-ghost" id="sign-out-btn" style="width:100%;color:var(--red);">
+    <button class="btn btn-ghost" id="sign-out-btn" style="width:100%;color:var(--color-danger);">
       Sign Out
     </button>
   `;
@@ -51,8 +54,8 @@ export async function renderSettingsView(container: HTMLElement): Promise<void> 
       const pref = (btn as HTMLElement).dataset.theme as ThemePreference;
       await saveThemePreference(pref);
       applyTheme(resolveTheme(pref));
-      container.querySelectorAll('.theme-btn').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
+      container.querySelectorAll('.theme-btn').forEach((b) => b.classList.remove('theme-btn-selected'));
+      btn.classList.add('theme-btn-selected');
     });
   });
 

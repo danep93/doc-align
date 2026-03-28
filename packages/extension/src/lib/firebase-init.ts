@@ -2,9 +2,12 @@ import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: 'YOUR_FIREBASE_API_KEY',
-  authDomain: 'YOUR_PROJECT.firebaseapp.com',
-  projectId: 'YOUR_PROJECT_ID',
+  apiKey: 'AIzaSyBMkCQe1R_YALthMKtE8xXZRY0CQK1jeVE',
+  authDomain: 'doc-align.firebaseapp.com',
+  projectId: 'doc-align',
+  storageBucket: 'doc-align.firebasestorage.app',
+  messagingSenderId: '255634835670',
+  appId: '1:255634835670:web:509f1fd1ede69a53f1e177',
 };
 
 let app: FirebaseApp | null = null;
