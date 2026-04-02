@@ -2,7 +2,8 @@ import { DEV_MODE, devApi } from './dev-mode';
 import { getIdToken, getCurrentUser } from './auth';
 import { deleteSnapshot } from './google-apis';
 import { TIER_LIMITS } from '@doc-align/shared';
-import type { Signature, SignOff, DocReference, UserProfile, Tier } from '@doc-align/shared';
+import type { Signature, SignOff, DocReference, UserProfile, Tier, TrackedDoc, Organization, OrgMemberResponse, OrgRole, Invite, GroupResponse, Group } from '@doc-align/shared';
+import { canTrackDocument } from '@doc-align/shared';
 
 const API_BASE = 'http://localhost:8080/api';
 
@@ -199,6 +200,82 @@ const localApi = {
   createCheckout: async (_plan: string) => ({
     url: 'https://example.com/checkout-not-available',
   }),
+
+  getTrackedDocs: async (): Promise<TrackedDoc[]> => {
+    const docs = await loadStore<TrackedDoc[]>('local_tracked_docs', []);
+    const userId = await getLocalUserId();
+    return docs.filter((d) => d.userId === userId);
+  },
+
+  trackDoc: async (data: { documentId: string; title: string; baselineRevisionId: string }): Promise<TrackedDoc> => {
+    const docs = await loadStore<TrackedDoc[]>('local_tracked_docs', []);
+    const userId = await getLocalUserId();
+    const userDocs = docs.filter((d) => d.userId === userId);
+    const userProfile = await localApi.getUser();
+    const tier = userProfile.tier as Tier;
+
+    if (!canTrackDocument(tier, userDocs.length)) {
+      throw new Error('Tracking limit reached');
+    }
+
+    // Remove existing tracking for this doc (if re-tracking)
+    const filtered = docs.filter((d) => !(d.documentId === data.documentId && d.userId === userId));
+
+    const tracked: TrackedDoc = {
+      id: `td_${Date.now()}`,
+      documentId: data.documentId,
+      userId,
+      title: data.title,
+      baselineRevisionId: data.baselineRevisionId,
+      trackedAt: new Date().toISOString(),
+    };
+    filtered.push(tracked);
+    await saveStore('local_tracked_docs', filtered);
+    return tracked;
+  },
+
+  untrackDoc: async (docId: string): Promise<{ success: boolean }> => {
+    const docs = await loadStore<TrackedDoc[]>('local_tracked_docs', []);
+    const userId = await getLocalUserId();
+    const toRemove = docs.find((d) => d.documentId === docId && d.userId === userId);
+    if (toRemove) {
+      await deleteSnapshot(toRemove.documentId, toRemove.baselineRevisionId);
+    }
+    const filtered = docs.filter((d) => !(d.documentId === docId && d.userId === userId));
+    await saveStore('local_tracked_docs', filtered);
+    return { success: true };
+  },
+
+  isDocTracked: async (docId: string): Promise<boolean> => {
+    const docs = await loadStore<TrackedDoc[]>('local_tracked_docs', []);
+    const userId = await getLocalUserId();
+    return docs.some((d) => d.documentId === docId && d.userId === userId);
+  },
+
+  // Organizations & Groups — not available in local mode
+  getMyOrgs: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  createOrganization: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  getOrganization: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  updateOrganization: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  getOrgMembers: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  searchOrgMembers: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  changeOrgMemberRole: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  removeOrgMember: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  leaveOrganization: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  createInvite: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  getOrgInvites: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  revokeInvite: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  getMyPendingInvites: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  acceptInvite: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  declineInvite: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  getOrgGroups: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  createGroup: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  updateGroup: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  deleteGroup: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  getGroupMembers: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  addGroupMember: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  removeGroupMember: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  leaveGroup: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
 };
 
 // --- Backend API with local fallback ---
@@ -243,6 +320,57 @@ const realApi = {
     request(`/signoffs/co-signers/${docId}/${revId}`),
   createCheckout: (plan: string) =>
     request('/subscriptions/checkout', { method: 'POST', body: JSON.stringify({ plan }) }),
+  getTrackedDocs: () => request<TrackedDoc[]>('/tracked-docs'),
+  trackDoc: (data: { documentId: string; title: string; baselineRevisionId: string }) =>
+    request<TrackedDoc>('/tracked-docs', { method: 'POST', body: JSON.stringify(data) }),
+  untrackDoc: (docId: string) =>
+    request<{ success: boolean }>(`/tracked-docs/${docId}`, { method: 'DELETE' }),
+  isDocTracked: async (docId: string) => {
+    const result = await request<{ tracked: boolean }>(`/tracked-docs/${docId}/status`);
+    return result.tracked;
+  },
+
+  // Organizations
+  getMyOrgs: () => request<Organization[]>('/organizations/me'),
+  createOrganization: (data: { name: string }) =>
+    request<Organization>('/organizations', { method: 'POST', body: JSON.stringify(data) }),
+  getOrganization: (orgId: string) => request<Organization>(`/organizations/${orgId}`),
+  updateOrganization: (orgId: string, data: { name?: string }) =>
+    request<void>(`/organizations/${orgId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  getOrgMembers: (orgId: string) => request<OrgMemberResponse[]>(`/organizations/${orgId}/members`),
+  searchOrgMembers: (orgId: string, email: string) =>
+    request<OrgMemberResponse[]>(`/organizations/${orgId}/members/search?email=${encodeURIComponent(email)}`),
+  changeOrgMemberRole: (orgId: string, userId: string, role: OrgRole) =>
+    request<void>(`/organizations/${orgId}/members/${userId}`, { method: 'PATCH', body: JSON.stringify({ role }) }),
+  removeOrgMember: (orgId: string, userId: string) =>
+    request<void>(`/organizations/${orgId}/members/${userId}`, { method: 'DELETE' }),
+  leaveOrganization: (orgId: string) =>
+    request<void>(`/organizations/${orgId}/members/me/leave`, { method: 'POST' }),
+  createInvite: (orgId: string, data: { email: string; role: OrgRole; groupId?: string }) =>
+    request<Invite>(`/organizations/${orgId}/invites`, { method: 'POST', body: JSON.stringify(data) }),
+  getOrgInvites: (orgId: string) => request<Invite[]>(`/organizations/${orgId}/invites`),
+  revokeInvite: (orgId: string, inviteId: string) =>
+    request<void>(`/organizations/${orgId}/invites/${inviteId}`, { method: 'DELETE' }),
+  getMyPendingInvites: () => request<Invite[]>('/users/me/invites'),
+  acceptInvite: (inviteId: string) =>
+    request<void>(`/users/me/invites/${inviteId}/accept`, { method: 'POST' }),
+  declineInvite: (inviteId: string) =>
+    request<void>(`/users/me/invites/${inviteId}/decline`, { method: 'POST' }),
+  getOrgGroups: (orgId: string) => request<GroupResponse[]>(`/organizations/${orgId}/groups`),
+  createGroup: (orgId: string, data: { name: string; directorId?: string; managerId?: string }) =>
+    request<Group>(`/organizations/${orgId}/groups`, { method: 'POST', body: JSON.stringify(data) }),
+  updateGroup: (orgId: string, groupId: string, data: { name?: string; directorId?: string; managerId?: string }) =>
+    request<void>(`/organizations/${orgId}/groups/${groupId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteGroup: (orgId: string, groupId: string) =>
+    request<void>(`/organizations/${orgId}/groups/${groupId}`, { method: 'DELETE' }),
+  getGroupMembers: (orgId: string, groupId: string) =>
+    request<OrgMemberResponse[]>(`/organizations/${orgId}/groups/${groupId}/members`),
+  addGroupMember: (orgId: string, groupId: string, userId: string) =>
+    request<void>(`/organizations/${orgId}/groups/${groupId}/members`, { method: 'POST', body: JSON.stringify({ userId }) }),
+  removeGroupMember: (orgId: string, groupId: string, userId: string) =>
+    request<void>(`/organizations/${orgId}/groups/${groupId}/members/${userId}`, { method: 'DELETE' }),
+  leaveGroup: (orgId: string, groupId: string) =>
+    request<void>(`/organizations/${orgId}/groups/${groupId}/members/me/leave`, { method: 'POST' }),
 };
 
 // Proxy that resolves the backend on first call
@@ -258,6 +386,127 @@ const proxyApi = {
   deleteSignOff: async (signOffId: string) => (await getApi()).deleteSignOff(signOffId),
   getCoSigners: async (docId: string, revId: string) => (await getApi()).getCoSigners(docId, revId),
   createCheckout: async (plan: string) => (await getApi()).createCheckout(plan),
+  getTrackedDocs: async () => (await getApi()).getTrackedDocs(),
+  trackDoc: async (data: { documentId: string; title: string; baselineRevisionId: string }) => (await getApi()).trackDoc(data),
+  untrackDoc: async (docId: string) => (await getApi()).untrackDoc(docId),
+  isDocTracked: async (docId: string) => (await getApi()).isDocTracked(docId),
+
+  // Organizations
+  getMyOrgs: async () => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.getMyOrgs();
+  },
+  createOrganization: async (data: { name: string }) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.createOrganization(data);
+  },
+  getOrganization: async (orgId: string) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.getOrganization(orgId);
+  },
+  updateOrganization: async (orgId: string, data: { name?: string }) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.updateOrganization(orgId, data);
+  },
+  getOrgMembers: async (orgId: string) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.getOrgMembers(orgId);
+  },
+  searchOrgMembers: async (orgId: string, email: string) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.searchOrgMembers(orgId, email);
+  },
+  changeOrgMemberRole: async (orgId: string, userId: string, role: OrgRole) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.changeOrgMemberRole(orgId, userId, role);
+  },
+  removeOrgMember: async (orgId: string, userId: string) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.removeOrgMember(orgId, userId);
+  },
+  leaveOrganization: async (orgId: string) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.leaveOrganization(orgId);
+  },
+  createInvite: async (orgId: string, data: { email: string; role: OrgRole; groupId?: string }) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.createInvite(orgId, data);
+  },
+  getOrgInvites: async (orgId: string) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.getOrgInvites(orgId);
+  },
+  revokeInvite: async (orgId: string, inviteId: string) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.revokeInvite(orgId, inviteId);
+  },
+  getMyPendingInvites: async () => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.getMyPendingInvites();
+  },
+  acceptInvite: async (inviteId: string) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.acceptInvite(inviteId);
+  },
+  declineInvite: async (inviteId: string) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.declineInvite(inviteId);
+  },
+  getOrgGroups: async (orgId: string) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.getOrgGroups(orgId);
+  },
+  createGroup: async (orgId: string, data: { name: string; directorId?: string; managerId?: string }) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.createGroup(orgId, data);
+  },
+  updateGroup: async (orgId: string, groupId: string, data: { name?: string; directorId?: string; managerId?: string }) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.updateGroup(orgId, groupId, data);
+  },
+  deleteGroup: async (orgId: string, groupId: string) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.deleteGroup(orgId, groupId);
+  },
+  getGroupMembers: async (orgId: string, groupId: string) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.getGroupMembers(orgId, groupId);
+  },
+  addGroupMember: async (orgId: string, groupId: string, userId: string) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.addGroupMember(orgId, groupId, userId);
+  },
+  removeGroupMember: async (orgId: string, groupId: string, userId: string) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.removeGroupMember(orgId, groupId, userId);
+  },
+  leaveGroup: async (orgId: string, groupId: string) => {
+    const a = await getApi();
+    if (a === localApi) throw new Error('Groups require backend connection');
+    return a.leaveGroup(orgId, groupId);
+  },
 };
 
 export const api = DEV_MODE ? devApi : proxyApi;

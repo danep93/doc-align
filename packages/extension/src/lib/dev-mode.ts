@@ -1,8 +1,8 @@
 // Dev mode: set to true to bypass Firebase auth and use local storage stubs
 export const DEV_MODE = false;
 
-import type { Signature, SignOff, DocReference, UserProfile } from '@doc-align/shared';
-import { TIER_LIMITS } from '@doc-align/shared';
+import type { Signature, SignOff, DocReference, UserProfile, TrackedDoc, Tier } from '@doc-align/shared';
+import { TIER_LIMITS, canTrackDocument } from '@doc-align/shared';
 
 const devUser: UserProfile = {
   id: 'dev-user-1',
@@ -159,4 +159,76 @@ export const devApi = {
   createCheckout: async (_plan: string) => ({
     url: 'https://example.com/checkout-disabled-in-dev-mode',
   }),
+
+  getTrackedDocs: async (): Promise<TrackedDoc[]> => {
+    const docs = await loadStore<TrackedDoc[]>('dev_tracked_docs', []);
+    return docs.filter((d) => d.userId === devUser.id);
+  },
+
+  trackDoc: async (data: { documentId: string; title: string; baselineRevisionId: string }): Promise<TrackedDoc> => {
+    const docs = await loadStore<TrackedDoc[]>('dev_tracked_docs', []);
+    const userDocs = docs.filter((d) => d.userId === devUser.id);
+    const tier = devUser.tier as Tier;
+
+    if (!canTrackDocument(tier, userDocs.length)) {
+      throw new Error('Tracking limit reached');
+    }
+
+    // Remove existing tracking for this doc (if re-tracking)
+    const filtered = docs.filter((d) => !(d.documentId === data.documentId && d.userId === devUser.id));
+
+    const tracked: TrackedDoc = {
+      id: `td_${Date.now()}`,
+      documentId: data.documentId,
+      userId: devUser.id,
+      title: data.title,
+      baselineRevisionId: data.baselineRevisionId,
+      trackedAt: new Date().toISOString(),
+    };
+    filtered.push(tracked);
+    await saveStore('dev_tracked_docs', filtered);
+    return tracked;
+  },
+
+  untrackDoc: async (docId: string): Promise<{ success: boolean }> => {
+    const docs = await loadStore<TrackedDoc[]>('dev_tracked_docs', []);
+    const toRemove = docs.find((d) => d.documentId === docId && d.userId === devUser.id);
+    if (toRemove) {
+      const snapshotKey = `snapshot_${toRemove.documentId}_${toRemove.baselineRevisionId}`;
+      await new Promise<void>((resolve) => chrome.storage.local.remove(snapshotKey, resolve));
+    }
+    const filtered = docs.filter((d) => !(d.documentId === docId && d.userId === devUser.id));
+    await saveStore('dev_tracked_docs', filtered);
+    return { success: true };
+  },
+
+  isDocTracked: async (docId: string): Promise<boolean> => {
+    const docs = await loadStore<TrackedDoc[]>('dev_tracked_docs', []);
+    return docs.some((d) => d.documentId === docId && d.userId === devUser.id);
+  },
+
+  // Organizations & Groups — require backend
+  getMyOrgs: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  createOrganization: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  getOrganization: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  updateOrganization: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  getOrgMembers: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  searchOrgMembers: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  changeOrgMemberRole: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  removeOrgMember: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  leaveOrganization: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  createInvite: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  getOrgInvites: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  revokeInvite: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  getMyPendingInvites: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  acceptInvite: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  declineInvite: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  getOrgGroups: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  createGroup: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  updateGroup: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  deleteGroup: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  getGroupMembers: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  addGroupMember: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  removeGroupMember: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+  leaveGroup: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
 };
