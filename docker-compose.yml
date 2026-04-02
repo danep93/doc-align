@@ -1,0 +1,14 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: packages/backend/Dockerfile.dev
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./packages/backend/src:/app/packages/backend/src
+      - ./packages/shared/src:/app/packages/shared/src
+      - ~/.config/gcloud:/root/.config/gcloud:ro
+    environment:
+      - PORT=8080
+      - GOOGLE_CLOUD_PROJECT=doc-align-staging

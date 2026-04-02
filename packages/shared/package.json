@@ -2,6 +2,7 @@
   "name": "@doc-align/shared",
   "version": "0.1.0",
   "description": "Shared types, validation, and tier definitions for doc-align",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

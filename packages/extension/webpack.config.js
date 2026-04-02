@@ -21,6 +21,7 @@ module.exports = (env, argv) => {
       rules: [
         { test: /\.ts$/, use: 'ts-loader', exclude: /node_modules/ },
         { test: /\.css$/, use: [MiniCssExtractPlugin.loader, 'css-loader'] },
+        { test: /\.js$/, resolve: { fullySpecified: false } },
       ],
     },
     resolve: {
