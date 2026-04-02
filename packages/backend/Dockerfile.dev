@@ -6,15 +6,22 @@ WORKDIR /app
 
 # Copy workspace config
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY tsconfig.base.json ./
 
-# Copy package.json files for dependency resolution
-COPY packages/shared/package.json packages/shared/
+# Copy shared package (full source — we build it inside the container)
+COPY packages/shared/ packages/shared/
+
+# Copy backend package.json for dependency resolution
 COPY packages/backend/package.json packages/backend/
+COPY packages/backend/tsconfig.json packages/backend/
 
 # Install all dependencies (including dev for tsx)
 RUN pnpm install --filter @doc-align/backend --filter @doc-align/shared
 
-# Source files are mounted as volumes — not copied
+# Build the shared package so backend can import from it
+RUN pnpm --filter @doc-align/shared run build
+
+# Backend source files are mounted as volumes — not copied
 WORKDIR /app/packages/backend
 
 ENV PORT=8080

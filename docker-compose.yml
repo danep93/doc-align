@@ -8,6 +8,7 @@ services:
     volumes:
       - ./packages/backend/src:/app/packages/backend/src
       - ./packages/shared/src:/app/packages/shared/src
+      - ./packages/shared/dist:/app/packages/shared/dist
       - ~/.config/gcloud:/root/.config/gcloud:ro
     environment:
       - PORT=8080
