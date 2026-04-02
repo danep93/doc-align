@@ -46,6 +46,21 @@ export const DocReferenceSchema = z.object({
   updatedAt: z.string(),
 });
 
+export const TrackedDocSchema = z.object({
+  id: z.string().min(1),
+  documentId: z.string().min(1),
+  userId: z.string().min(1),
+  title: z.string().min(1),
+  baselineRevisionId: z.string().min(1),
+  trackedAt: z.string(),
+});
+
+export const CreateTrackedDocSchema = z.object({
+  documentId: z.string().min(1),
+  title: z.string().min(1),
+  baselineRevisionId: z.string().min(1),
+});
+
 export const UserProfileSchema = z.object({
   id: z.string().min(1),
   email: z.string().email(),
@@ -54,4 +69,38 @@ export const UserProfileSchema = z.object({
   signOffCount: z.number().int().min(0),
   signOffCountResetAt: z.string(),
   createdAt: z.string(),
+});
+
+export const CreateOrganizationSchema = z.object({
+  name: z.string().min(1).max(100).regex(/^[\w\s\-.,&'()]+$/, 'Name contains invalid characters'),
+});
+
+export const UpdateOrganizationSchema = z.object({
+  name: z.string().min(1).max(100).regex(/^[\w\s\-.,&'()]+$/, 'Name contains invalid characters').optional(),
+});
+
+export const CreateGroupSchema = z.object({
+  name: z.string().min(1).max(100).regex(/^[\w\s\-.,&'()]+$/, 'Name contains invalid characters'),
+  directorId: z.string().optional(),
+  managerId: z.string().optional(),
+});
+
+export const UpdateGroupSchema = z.object({
+  name: z.string().min(1).max(100).regex(/^[\w\s\-.,&'()]+$/, 'Name contains invalid characters').optional(),
+  directorId: z.string().nullable().optional(),
+  managerId: z.string().nullable().optional(),
+});
+
+export const CreateInviteSchema = z.object({
+  email: z.string().email(),
+  role: z.enum(['admin', 'director', 'member']),
+  groupId: z.string().optional(),
+});
+
+export const AddGroupMemberSchema = z.object({
+  userId: z.string().min(1),
+});
+
+export const ChangeRoleSchema = z.object({
+  role: z.enum(['admin', 'director', 'member']),
 });

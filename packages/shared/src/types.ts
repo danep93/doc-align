@@ -47,6 +47,15 @@ export interface SignOffWithSigner {
   signerName: string;
 }
 
+export interface TrackedDoc {
+  id: string;
+  documentId: string;
+  userId: string;
+  title: string;
+  baselineRevisionId: string;
+  trackedAt: string;
+}
+
 export interface DocSignOffSummary {
   documentId: string;
   title: string;
@@ -55,4 +64,71 @@ export interface DocSignOffSummary {
   totalSignOffsOnRevision: number;
   signerNames: string[];
   hasChanged: boolean;
+}
+
+// --- Organization & Groups ---
+
+export type OrgRole = 'admin' | 'director' | 'member';
+export type InviteStatus = 'pending' | 'accepted' | 'declined' | 'revoked';
+
+export interface Organization {
+  id: string;
+  name: string;
+  ownerId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrganizationMember {
+  id: string;
+  organizationId: string;
+  userId: string;
+  role: OrgRole;
+  createdAt: string;
+}
+
+export interface Group {
+  id: string;
+  organizationId: string;
+  name: string;
+  directorId?: string;
+  managerId?: string;
+  createdById: string;
+  createdAt: string;
+}
+
+export interface GroupMember {
+  id: string;
+  groupId: string;
+  userId: string;
+  createdAt: string;
+}
+
+export interface Invite {
+  id: string;
+  organizationId: string;
+  inviterUserId: string;
+  inviteeEmail: string;
+  role: OrgRole;
+  groupId?: string;
+  status: InviteStatus;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface OrgMemberResponse {
+  userId: string;
+  email: string;
+  displayName: string;
+  role: OrgRole;
+  createdAt: string;
+}
+
+export interface GroupResponse {
+  id: string;
+  name: string;
+  directorName?: string;
+  managerName?: string;
+  memberCount: number;
+  createdAt: string;
 }

@@ -51,3 +51,7 @@ export function canUseDiffViewer(tier: Tier): boolean {
 export function canUseFullSignature(tier: Tier): boolean {
   return TIER_LIMITS[tier].signatureFormat === 'full';
 }
+
+export function canCreateOrganization(tier: Tier): boolean {
+  return tier === 'pro' || tier === 'enterprise';
+}
