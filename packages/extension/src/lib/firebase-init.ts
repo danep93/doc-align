@@ -22,12 +22,12 @@ const configs: Record<string, {
     appId: '1:255634835670:web:509f1fd1ede69a53f1e177',
   },
   'doc-align-staging': {
-    apiKey: 'STAGING_API_KEY',
+    apiKey: 'AIzaSyDJ9Uk3wbRhiLr4s5QV1JBWMGbMxuWAFM8',
     authDomain: 'doc-align-staging.firebaseapp.com',
     projectId: 'doc-align-staging',
     storageBucket: 'doc-align-staging.firebasestorage.app',
-    messagingSenderId: 'STAGING_SENDER_ID',
-    appId: 'STAGING_APP_ID',
+    messagingSenderId: '601691463369',
+    appId: '1:601691463369:web:9f6a489d930a042dd0b718',
   },
 };
 

@@ -3,16 +3,6 @@
     {
       "collectionGroup": "orgMembers",
       "queryScope": "COLLECTION",
-      "fields": [{ "fieldPath": "organizationId", "order": "ASCENDING" }]
-    },
-    {
-      "collectionGroup": "orgMembers",
-      "queryScope": "COLLECTION",
-      "fields": [{ "fieldPath": "userId", "order": "ASCENDING" }]
-    },
-    {
-      "collectionGroup": "orgMembers",
-      "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "organizationId", "order": "ASCENDING" },
         { "fieldPath": "userId", "order": "ASCENDING" }
@@ -21,40 +11,10 @@
     {
       "collectionGroup": "groups",
       "queryScope": "COLLECTION",
-      "fields": [{ "fieldPath": "organizationId", "order": "ASCENDING" }]
-    },
-    {
-      "collectionGroup": "groups",
-      "queryScope": "COLLECTION",
-      "fields": [{ "fieldPath": "managerId", "order": "ASCENDING" }]
-    },
-    {
-      "collectionGroup": "groups",
-      "queryScope": "COLLECTION",
-      "fields": [{ "fieldPath": "directorId", "order": "ASCENDING" }]
-    },
-    {
-      "collectionGroup": "groups",
-      "queryScope": "COLLECTION",
-      "fields": [{ "fieldPath": "createdById", "order": "ASCENDING" }]
-    },
-    {
-      "collectionGroup": "groups",
-      "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "organizationId", "order": "ASCENDING" },
         { "fieldPath": "managerId", "order": "ASCENDING" }
       ]
-    },
-    {
-      "collectionGroup": "groupMembers",
-      "queryScope": "COLLECTION",
-      "fields": [{ "fieldPath": "groupId", "order": "ASCENDING" }]
-    },
-    {
-      "collectionGroup": "groupMembers",
-      "queryScope": "COLLECTION",
-      "fields": [{ "fieldPath": "userId", "order": "ASCENDING" }]
     },
     {
       "collectionGroup": "groupMembers",
