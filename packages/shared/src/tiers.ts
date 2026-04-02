@@ -20,7 +20,7 @@ export const TIER_LIMITS: Record<Tier, TierLimits> = {
   },
   pro: {
     maxSignOffsPerMonth: Infinity,
-    maxTrackedDocuments: Infinity,
+    maxTrackedDocuments: 500,
     maxCheckpointsPerDoc: 10,
     signatureFormat: 'full',
     richDiffViewer: true,
@@ -28,7 +28,7 @@ export const TIER_LIMITS: Record<Tier, TierLimits> = {
   },
   enterprise: {
     maxSignOffsPerMonth: Infinity,
-    maxTrackedDocuments: Infinity,
+    maxTrackedDocuments: 500,
     maxCheckpointsPerDoc: 10,
     signatureFormat: 'full',
     richDiffViewer: true,
