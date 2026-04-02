@@ -8,6 +8,8 @@ import usersRouter from './routes/users';
 import signaturesRouter from './routes/signatures';
 import signoffsRouter from './routes/signoffs';
 import subscriptionsRouter from './routes/subscriptions';
+import organizationRoutes from './routes/organizations';
+import groupRoutes from './routes/groups';
 
 const app: Express = express();
 const PORT = process.env.PORT || 8080;
@@ -28,6 +30,9 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/users', authMiddleware, usersRouter);
 app.use('/api/signatures', authMiddleware, signaturesRouter);
 app.use('/api/signoffs', authMiddleware, signoffsRouter);
+
+app.use('/api/organizations', authMiddleware, organizationRoutes);
+app.use('/api/organizations/:orgId/groups', authMiddleware, groupRoutes);
 
 // Subscriptions: checkout is protected, webhook is not
 app.use('/api/subscriptions', subscriptionsRouter);
