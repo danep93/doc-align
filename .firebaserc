@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "staging": "doc-align-staging",
+    "production": "doc-align"
+  }
+}

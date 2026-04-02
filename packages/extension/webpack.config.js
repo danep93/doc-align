@@ -1,4 +1,5 @@
 const path = require('path');
+const webpack = require('webpack');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 
@@ -34,6 +35,14 @@ module.exports = (env, argv) => {
         ],
       }),
       new MiniCssExtractPlugin({ filename: '[name].css' }),
+      new webpack.DefinePlugin({
+        'process.env.API_BASE': JSON.stringify(
+          process.env.API_BASE || 'http://localhost:8080/api'
+        ),
+        'process.env.FIREBASE_PROJECT_ID': JSON.stringify(
+          process.env.FIREBASE_PROJECT_ID || 'doc-align'
+        ),
+      }),
     ],
     devtool: isProduction ? false : 'inline-source-map',
     optimization: { minimize: isProduction },

@@ -5,7 +5,8 @@ import { TIER_LIMITS } from '@doc-align/shared';
 import type { Signature, SignOff, DocReference, UserProfile, Tier, TrackedDoc, Organization, OrgMemberResponse, OrgRole, Invite, GroupResponse, Group } from '@doc-align/shared';
 import { canTrackDocument } from '@doc-align/shared';
 
-const API_BASE = 'http://localhost:8080/api';
+declare const process: { env: { API_BASE?: string } };
+const API_BASE = process.env.API_BASE || 'http://localhost:8080/api';
 
 export function buildUrl(base: string, path: string): string {
   const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
