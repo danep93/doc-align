@@ -2,8 +2,9 @@ import './popup.css';
 import { signIn, onAuthChange } from '../lib/auth';
 import { initTheme } from '../lib/theme';
 import { renderSignOffView } from './views/sign-off';
-import { renderDocumentsView, handleReSignOff } from './views/documents';
+import { renderDocumentsView, handleReSignOff, clearDocumentsCache } from './views/documents';
 import { renderSettingsView } from './views/settings';
+import { renderGroupsView } from './views/groups';
 import { initCreateSignatureModal } from './components/create-signature-modal';
 import { api } from '../lib/api';
 import type { UserProfile } from '@doc-align/shared';
@@ -33,12 +34,16 @@ function renderTab(target: string): void {
   renderedTabs.add(target);
   if (target === 'signoff') renderSignOffView(document.getElementById('signoff-view')!);
   if (target === 'documents') renderDocumentsView(document.getElementById('documents-view')!);
+  if (target === 'groups') renderGroupsView(document.getElementById('groups-view')!);
   if (target === 'settings') renderSettingsView(document.getElementById('settings-view')!);
 }
 
 // Force re-render a tab (e.g., after sign-off changes data)
 export function invalidateTab(target: string): void {
   renderedTabs.delete(target);
+  if (target === 'documents') {
+    clearDocumentsCache();
+  }
 }
 
 // Modal close handlers
@@ -93,6 +98,7 @@ onAuthChange(async (user) => {
     // Preload all tabs so switching is instant
     renderTab('signoff');
     renderTab('documents');
+    renderTab('groups');
     renderTab('settings');
   } else if (!authResolved) {
     // First null callback — wait a moment for Firebase to restore session
