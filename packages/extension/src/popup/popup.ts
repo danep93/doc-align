@@ -100,6 +100,19 @@ onAuthChange(async (user) => {
     renderTab('documents');
     renderTab('groups');
     renderTab('settings');
+
+    // Check for pending invites
+    try {
+      const invites = await api.getMyPendingInvites();
+      if (invites.length > 0) {
+        const groupsTab = document.querySelector('.tab[data-tab="groups"]');
+        if (groupsTab) {
+          groupsTab.innerHTML = `Groups <span class="tab-badge">${invites.length}</span>`;
+        }
+      }
+    } catch {
+      // Backend unavailable — no badge
+    }
   } else if (!authResolved) {
     // First null callback — wait a moment for Firebase to restore session
     setTimeout(() => {
