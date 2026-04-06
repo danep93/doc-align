@@ -101,6 +101,19 @@ This spec catches misconfiguration bugs that are invisible to typecheck/build:
 
 ### 3. CI/CD Pipeline Integration
 
+#### CI headed mode requirement
+
+Chrome extension testing requires headed mode (Playwright's `headless: false`) — extensions cannot load in headless Chromium. In CI (Linux runners), this means running tests under `xvfb-run` (virtual framebuffer) to provide a display. Do not attempt to set `headless: true` in the Playwright config; it will silently fail to load the extension.
+
+```yaml
+# GitHub Actions example
+- run: xvfb-run pnpm test:e2e
+```
+
+#### CI auth state expiry
+
+When the saved auth tokens expire in CI, E2E tests will fail with auth-related errors (popup stays on sign-in screen, API calls return 401). The fix is to re-run `pnpm test:e2e:save-auth` with the test Google account and update the CI secret. Google OAuth tokens typically last weeks to months, so this is infrequent.
+
 #### PR gate (every PR to `main`)
 
 Current CI already runs: install → typecheck → build → unit tests.
@@ -108,7 +121,7 @@ Current CI already runs: install → typecheck → build → unit tests.
 Add after unit tests:
 1. Build extension with staging config
 2. Restore auth state from CI secret
-3. Run full E2E suite against staging backend
+3. Run full E2E suite against staging backend via `xvfb-run`
 4. PR cannot merge if E2E fails
 
 Updated CI job sequence:
