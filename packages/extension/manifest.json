@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "Sign off on Google Docs and track changes. Privacy-first document alignment.",
   "permissions": ["storage", "identity", "activeTab", "clipboardWrite", "scripting"],
+  "host_permissions": ["http://localhost:8080/*"],
   "background": {
     "service_worker": "background.js",
     "type": "module"

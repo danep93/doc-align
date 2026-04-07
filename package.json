@@ -6,6 +6,9 @@
   "scripts": {
     "build-all": "pnpm -r run build",
     "test-all": "pnpm -r run test",
+    "test:e2e": "pnpm --filter @doc-align/e2e run test",
+    "test:e2e:headed": "pnpm --filter @doc-align/e2e run test:headed",
+    "test:e2e:save-auth": "pnpm --filter @doc-align/e2e run save-auth",
     "typecheck": "pnpm -r run typecheck",
     "clean": "pnpm -r run clean",
     "deploy:staging": "pnpm run build-all && gcloud run deploy doc-align-api --source packages/backend --project doc-align-staging --region us-central1 --allow-unauthenticated",

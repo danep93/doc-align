@@ -19,7 +19,9 @@ export async function createSignature(
     createdAt: new Date().toISOString(),
     status: 'active',
   };
-  await ref.set(signature);
+  // Firestore rejects undefined values — strip them
+  const cleanData = JSON.parse(JSON.stringify(signature));
+  await ref.set(cleanData);
   return signature;
 }
 

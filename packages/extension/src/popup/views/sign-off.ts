@@ -4,8 +4,8 @@ import { getLatestRevisionId, exportDocAsText, storeSnapshot } from '../../lib/g
 import { renderSignatureImage, computeImageHash } from '../../lib/signature-renderer';
 import { invalidateTab } from '../popup';
 import { ensureContentScript, getActiveDocTab } from '../../lib/inject-content-script';
-import { TIER_LIMITS } from '@doc-align/shared';
-import type { Signature, SignOff, UserProfile, Tier } from '@doc-align/shared';
+import { TIER_LIMITS, canTrackDocument } from '@doc-align/shared';
+import type { Signature, SignOff, UserProfile, Tier, TrackedDoc } from '@doc-align/shared';
 
 interface DocContext {
   docId: string;
@@ -24,10 +24,12 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
     return;
   }
 
-  const [signatures, signOffs, profile] = await Promise.all([
+  const [signatures, signOffs, profile, trackedDocs, isTracked] = await Promise.all([
     api.getSignatures() as Promise<Signature[]>,
     api.getSignOffs() as Promise<SignOff[]>,
     api.getUser() as Promise<UserProfile>,
+    api.getTrackedDocs() as Promise<TrackedDoc[]>,
+    api.isDocTracked(docContext.docId) as Promise<boolean>,
   ]);
 
   if (signatures.length === 0) {
@@ -58,6 +60,31 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
     buttonText = 'Re-Sign This Doc';
   }
 
+  // Determine track button state
+  const trackedCount = trackedDocs.length;
+  const atTrackingLimit = !canTrackDocument(tier, trackedCount);
+  const showTrackButton = !alreadySigned; // Only show track button if doc is not signed
+
+  let trackButtonHtml = '';
+  if (showTrackButton) {
+    if (isTracked) {
+      trackButtonHtml = `
+        <button class="btn btn-ghost" id="track-doc-btn" style="width:100%;margin-top:8px;" disabled>Already Tracking</button>
+      `;
+    } else if (atTrackingLimit) {
+      trackButtonHtml = `
+        <button class="btn btn-ghost" id="track-doc-btn" style="width:100%;margin-top:8px;" disabled>Tracking limit reached</button>
+        <div style="font-size:11px;color:var(--color-text-secondary);text-align:center;margin-top:6px;">
+          <a href="#" id="track-upgrade-link" style="color:var(--color-accent);text-decoration:none;">Upgrade to Pro</a> for up to 500 tracked documents
+        </div>
+      `;
+    } else {
+      trackButtonHtml = `
+        <button class="btn btn-ghost" id="track-doc-btn" style="width:100%;margin-top:8px;">Track This Doc</button>
+      `;
+    }
+  }
+
   container.innerHTML = `
     <div style="margin-bottom:12px;">
       <div style="font-size:11px;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:0.5px;">Current Document</div>
@@ -77,6 +104,7 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
     </div>
     <div id="signoff-action-area">
       <button class="btn btn-primary" id="sign-off-btn" style="width:100%;">${buttonText}</button>
+      ${trackButtonHtml}
     </div>
   `;
 
@@ -88,6 +116,45 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
       // First sign-off or premium user — just do it
       executeSignOff(docContext, signatures[0]!);
     }
+  });
+
+  document.getElementById('track-doc-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('track-doc-btn') as HTMLButtonElement;
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    btn.textContent = 'Tracking...';
+
+    try {
+      let revisionId: string;
+      if (DEV_MODE) {
+        revisionId = await getDocTextHash();
+      } else {
+        revisionId = await getLatestRevisionId(docContext.docId);
+        const docText = await exportDocAsText(docContext.docId);
+        await storeSnapshot(docContext.docId, revisionId, docText);
+      }
+
+      await api.trackDoc({
+        documentId: docContext.docId,
+        title: docContext.title,
+        baselineRevisionId: revisionId,
+      });
+
+      btn.textContent = 'Already Tracking';
+      showToast('Now tracking this document');
+      invalidateTab('documents');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('Track doc error:', err);
+      showToast(`Failed to track: ${msg}`);
+      btn.disabled = false;
+      btn.textContent = 'Track This Doc';
+    }
+  });
+
+  document.getElementById('track-upgrade-link')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    document.querySelector('.tab[data-tab="settings"]')?.dispatchEvent(new Event('click'));
   });
 }
 
@@ -171,6 +238,12 @@ async function executeSignOff(docContext: DocContext, sig: Signature): Promise<v
       imageHash,
       documentTitle: docContext.title,
     });
+
+    // If doc was tracked, remove tracking (signed docs are not tracked)
+    const wasTracked = await api.isDocTracked(docContext.docId);
+    if (wasTracked) {
+      await api.untrackDoc(docContext.docId);
+    }
 
     // Update the action area to show success
     const actionArea = document.getElementById('signoff-action-area');

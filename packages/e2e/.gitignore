@@ -1,0 +1,4 @@
+.auth-state/
+test-results/
+playwright-report/
+dist/

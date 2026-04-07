@@ -30,12 +30,21 @@ document.querySelectorAll('.tab').forEach((tab) => {
   });
 });
 
-function renderTab(target: string): void {
+async function renderTab(target: string): Promise<void> {
   renderedTabs.add(target);
-  if (target === 'signoff') renderSignOffView(document.getElementById('signoff-view')!);
-  if (target === 'documents') renderDocumentsView(document.getElementById('documents-view')!);
-  if (target === 'groups') renderGroupsView(document.getElementById('groups-view')!);
-  if (target === 'settings') renderSettingsView(document.getElementById('settings-view')!);
+  const el = document.getElementById(`${target === 'signoff' ? 'signoff' : target === 'documents' ? 'documents' : target}-view`);
+  try {
+    if (target === 'signoff') await renderSignOffView(document.getElementById('signoff-view')!);
+    if (target === 'documents') await renderDocumentsView(document.getElementById('documents-view')!);
+    if (target === 'groups') await renderGroupsView(document.getElementById('groups-view')!);
+    if (target === 'settings') await renderSettingsView(document.getElementById('settings-view')!);
+  } catch (err) {
+    const container = document.getElementById(`${target}-view`) || el;
+    if (container) {
+      const msg = err instanceof Error ? err.message : String(err);
+      container.innerHTML = `<div class="empty-state"><p>Error: ${msg}</p></div>`;
+    }
+  }
 }
 
 // Force re-render a tab (e.g., after sign-off changes data)
@@ -96,10 +105,10 @@ onAuthChange(async (user) => {
     }
 
     // Preload all tabs so switching is instant
-    renderTab('signoff');
-    renderTab('documents');
-    renderTab('groups');
-    renderTab('settings');
+    await renderTab('signoff');
+    await renderTab('documents');
+    await renderTab('groups');
+    await renderTab('settings');
 
     // Check for pending invites
     try {
