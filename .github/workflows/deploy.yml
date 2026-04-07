@@ -96,6 +96,46 @@ jobs:
           URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --project ${{ env.GCP_PROJECT_STAGING }} --region ${{ env.GCP_REGION }} --format='value(status.url)')
           echo "Staging API: $URL/api/health"
 
+  e2e-staging:
+    needs: deploy-staging
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @doc-align/e2e exec playwright install chromium
+
+      - name: Restore E2E auth state
+        run: |
+          mkdir -p packages/e2e/.auth-state
+          echo '${{ secrets.E2E_AUTH_STATE }}' | base64 -d | tar xz -C packages/e2e/.auth-state
+
+      - name: Run E2E tests against staging
+        run: xvfb-run pnpm test:e2e
+
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-staging-results
+          path: |
+            packages/e2e/test-results/
+            packages/e2e/playwright-report/
+          retention-days: 7
+
   deploy-production:
     needs: build-and-test
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
@@ -150,3 +190,49 @@ jobs:
         run: |
           URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --project ${{ env.GCP_PROJECT_PROD }} --region ${{ env.GCP_REGION }} --format='value(status.url)')
           echo "Production API: $URL/api/health"
+
+  e2e-production-smoke:
+    needs: deploy-production
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @doc-align/e2e exec playwright install chromium
+
+      - name: Restore E2E auth state
+        run: |
+          mkdir -p packages/e2e/.auth-state
+          echo '${{ secrets.E2E_AUTH_STATE }}' | base64 -d | tar xz -C packages/e2e/.auth-state
+
+      - name: Build extension with production config
+        run: |
+          API_BASE=https://doc-align-api.run.app/api \
+          FIREBASE_PROJECT_ID=doc-align \
+          pnpm --filter @doc-align/extension run build
+
+      - name: Run smoke E2E tests against production (skip global setup to preserve prod build)
+        run: xvfb-run pnpm --filter @doc-align/e2e exec playwright test --grep "Authentication" --config playwright.config.ts --global-setup ""
+
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-production-smoke-results
+          path: |
+            packages/e2e/test-results/
+            packages/e2e/playwright-report/
+          retention-days: 7
