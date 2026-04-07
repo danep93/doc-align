@@ -9,6 +9,11 @@ const EXTENSION_DIST = path.resolve(__dirname, '../extension/dist');
 const ROOT_DIR = path.resolve(__dirname, '../..');
 
 export default async function globalSetup() {
+  if (process.env.SKIP_GLOBAL_SETUP) {
+    console.log('Skipping global setup (SKIP_GLOBAL_SETUP=1)');
+    return;
+  }
+
   console.log('\n=== E2E Global Setup ===\n');
 
   // 1. Check auth state

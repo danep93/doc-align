@@ -50,7 +50,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        run: pnpm --filter @doc-align/e2e exec playwright install chromium
+        run: pnpm --filter @doc-align/e2e exec playwright install --with-deps chromium
 
       - name: Restore E2E auth state
         run: |

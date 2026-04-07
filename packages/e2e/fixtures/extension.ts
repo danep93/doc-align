@@ -5,8 +5,18 @@ import fs from 'fs';
 const EXTENSION_PATH = path.resolve(__dirname, '../../extension/dist');
 const AUTH_STATE_DIR = path.resolve(__dirname, '../.auth-state');
 
-// Use the real Chrome installation
-const CHROME_PATH = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+// Use the real Chrome installation — detect platform for CI compatibility
+function getDefaultChromePath(): string {
+  if (process.platform === 'darwin') {
+    return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+  }
+  if (process.platform === 'linux') {
+    // Playwright's installed Chromium location
+    return chromium.executablePath();
+  }
+  return 'chrome';
+}
+const CHROME_PATH = process.env.CHROME_PATH || getDefaultChromePath();
 
 // To set up auth for the first time:
 // 1. Close ALL Chrome windows
