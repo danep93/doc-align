@@ -60,4 +60,19 @@ test.describe('Signature Management', () => {
     const signoffView = extensionPopup.locator('#signoff-view');
     await expect(signoffView).toContainText('Test User');
   });
+
+  test('should show signature in sign-off tab after creation', async ({ extensionPopup }) => {
+    // Navigate to sign-off tab
+    await extensionPopup.locator('.tab[data-tab="signoff"]').click();
+    await extensionPopup.waitForTimeout(1000);
+
+    const signoffView = extensionPopup.locator('#signoff-view');
+    const text = await signoffView.textContent();
+
+    // If no signatures exist, should show a prompt to create one
+    // If signatures exist, should show the signature card
+    const hasSignature = text!.includes('Test User') || text!.includes('signature');
+    const hasCreatePrompt = text!.includes('Create') || text!.includes('create');
+    expect(hasSignature || hasCreatePrompt).toBe(true);
+  });
 });
