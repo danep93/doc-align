@@ -28,5 +28,44 @@ jobs:
       - name: Build all packages
         run: pnpm run build-all
 
-      - name: Run tests
+      - name: Run unit tests
         run: pnpm run test-all
+
+  e2e-tests:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @doc-align/e2e exec playwright install chromium
+
+      - name: Restore E2E auth state
+        run: |
+          mkdir -p packages/e2e/.auth-state
+          echo '${{ secrets.E2E_AUTH_STATE }}' | base64 -d | tar xz -C packages/e2e/.auth-state
+
+      - name: Run E2E tests (headed via xvfb)
+        run: xvfb-run pnpm test:e2e
+
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: |
+            packages/e2e/test-results/
+            packages/e2e/playwright-report/
+          retention-days: 7
