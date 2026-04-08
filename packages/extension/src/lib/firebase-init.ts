@@ -31,7 +31,10 @@ const configs: Record<string, {
   },
 };
 
-const firebaseConfig = configs[projectId] || configs['doc-align']!;
+// Always use production Firebase for auth — the manifest's OAuth client_id is
+// registered in the production project. Staging only changes the API_BASE
+// (backend URL), not the auth provider.
+const firebaseConfig = configs['doc-align']!;
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
