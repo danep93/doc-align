@@ -115,6 +115,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Build shared package (needed by extension build)
+        run: pnpm --filter @doc-align/shared run build
+
       - name: Install Playwright Chromium
         run: npx playwright install chromium
         working-directory: packages/e2e
