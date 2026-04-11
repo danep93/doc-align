@@ -6,16 +6,17 @@
   "scripts": {
     "build-all": "pnpm -r run build",
     "test-all": "pnpm -r run test",
-    "test:e2e": "pnpm --filter @doc-align/e2e run test",
-    "test:e2e:headed": "pnpm --filter @doc-align/e2e run test:headed",
-    "test:e2e:save-auth": "pnpm --filter @doc-align/e2e run save-auth",
+    "build:extension:e2e": "E2E_MODE=true FIREBASE_PROJECT_ID=doc-align-staging API_BASE=https://doc-align-api-601691463369.us-central1.run.app/api pnpm --filter @doc-align/extension run build",
+    "test:e2e": "pnpm run build:extension:e2e && pnpm --filter @doc-align/e2e run test",
+    "test:e2e:headed": "pnpm run build:extension:e2e && pnpm --filter @doc-align/e2e run test:headed",
     "typecheck": "pnpm -r run typecheck",
     "clean": "pnpm -r run clean",
-    "deploy:staging": "pnpm run build-all && gcloud run deploy doc-align-api --source packages/backend --project doc-align-staging --region us-central1 --allow-unauthenticated",
-    "deploy:prod": "pnpm run build-all && gcloud run deploy doc-align-api --source packages/backend --project doc-align --region us-central1 --allow-unauthenticated",
+    "deploy:staging": "pnpm run build-all && gcloud run deploy doc-align-api --source . --project doc-align-staging --region us-central1 --allow-unauthenticated",
+    "deploy:prod": "pnpm run build-all && gcloud run deploy doc-align-api --source . --project doc-align --region us-central1 --allow-unauthenticated",
     "deploy:indexes:staging": "firebase deploy --only firestore:indexes --project doc-align-staging",
     "deploy:indexes:prod": "firebase deploy --only firestore:indexes --project doc-align",
-    "build:extension:staging": "API_BASE=https://doc-align-api-staging.run.app/api FIREBASE_PROJECT_ID=doc-align-staging pnpm --filter @doc-align/extension run build",
+    "smoke": "bash scripts/smoke-test.sh",
+    "build:extension:staging": "API_BASE=https://doc-align-api-601691463369.us-central1.run.app/api FIREBASE_PROJECT_ID=doc-align-staging pnpm --filter @doc-align/extension run build",
     "build:extension:prod": "API_BASE=https://doc-align-api.run.app/api FIREBASE_PROJECT_ID=doc-align pnpm --filter @doc-align/extension run build"
   },
   "engines": {

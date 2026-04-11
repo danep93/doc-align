@@ -47,7 +47,7 @@ async function saveAuthState() {
       '--disable-default-apps',
       '--disable-blink-features=AutomationControlled',
     ],
-    ignoreDefaultArgs: ['--enable-automation'],
+    ignoreDefaultArgs: ['--enable-automation', '--disable-extensions'],
   });
 
   const page = await context.newPage();

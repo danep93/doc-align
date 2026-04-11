@@ -8,6 +8,17 @@ import { renderGroupsView } from './views/groups';
 import { initCreateSignatureModal } from './components/create-signature-modal';
 import { api } from '../lib/api';
 import type { UserProfile } from '@doc-align/shared';
+import { E2E_MODE } from '../lib/dev-mode';
+
+// In E2E mode, expose a sign-in function for Playwright to call.
+// Uses Firebase email/password auth instead of chrome.identity OAuth.
+if (E2E_MODE) {
+  (window as any).__e2eSignIn = async (email: string, password: string) => {
+    const { signInWithEmailAndPassword } = await import('firebase/auth');
+    const { getFirebaseAuth } = await import('../lib/firebase-init');
+    await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
+  };
+}
 
 // Init theme
 initTheme();

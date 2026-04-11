@@ -28,5 +28,15 @@ jobs:
       - name: Build all packages
         run: pnpm run build-all
 
-      - name: Run tests
+      - name: Run unit tests
         run: pnpm run test-all
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+        working-directory: packages/e2e
+
+      - name: Run E2E tests
+        run: xvfb-run pnpm run test:e2e
+        env:
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
