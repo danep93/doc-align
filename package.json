@@ -5,7 +5,7 @@
   "description": "Sign-off and alignment platform for Google Docs",
   "scripts": {
     "build-all": "pnpm -r run build",
-    "test-all": "pnpm -r run test",
+    "test-all": "pnpm -r --filter '!@doc-align/e2e' run test",
     "build:extension:e2e": "E2E_MODE=true FIREBASE_PROJECT_ID=doc-align-staging API_BASE=https://doc-align-api-601691463369.us-central1.run.app/api pnpm --filter @doc-align/extension run build",
     "test:e2e": "pnpm run build:extension:e2e && pnpm --filter @doc-align/e2e run test",
     "test:e2e:headed": "pnpm run build:extension:e2e && pnpm --filter @doc-align/e2e run test:headed",
