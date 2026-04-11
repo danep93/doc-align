@@ -1,4 +1,4 @@
-import { STUB_GOOGLE_APIS } from '../../lib/dev-mode';
+import { E2E_MODE } from '../../lib/dev-mode';
 import { api } from '../../lib/api';
 import { getLatestRevisionId, exportDocAsText, storeSnapshot } from '../../lib/google-apis';
 import { renderSignatureImage, computeImageHash } from '../../lib/signature-renderer';
@@ -126,7 +126,7 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
 
     try {
       let revisionId: string;
-      if (STUB_GOOGLE_APIS) {
+      if (E2E_MODE) {
         revisionId = await getDocTextHash();
       } else {
         revisionId = await getLatestRevisionId(docContext.docId);
@@ -220,7 +220,7 @@ async function executeSignOff(docContext: DocContext, sig: Signature): Promise<v
     const imageHash = await computeImageHash(imageDataUrl);
 
     let revisionId: string;
-    if (STUB_GOOGLE_APIS) {
+    if (E2E_MODE) {
       revisionId = await getDocTextHash();
     } else {
       revisionId = await getLatestRevisionId(docContext.docId);

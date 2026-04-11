@@ -1,4 +1,4 @@
-import { STUB_GOOGLE_APIS } from '../../lib/dev-mode';
+import { E2E_MODE } from '../../lib/dev-mode';
 import { api } from '../../lib/api';
 import { getLatestRevisionId, exportDocAsText, storeSnapshot } from '../../lib/google-apis';
 import { renderDocCard } from '../components/doc-card';
@@ -42,9 +42,9 @@ async function updateDocRefTitle(docId: string, newTitle: string): Promise<void>
 }
 
 // Get text hash from the content script of a tab with the given doc ID.
-// Only works in DEV_MODE, and only if the doc is the currently active tab.
+// Only works in E2E_MODE, and only if the doc is the currently active tab.
 async function getDocTextHash(docId: string): Promise<string | null> {
-  if (!STUB_GOOGLE_APIS) return null;
+  if (!E2E_MODE) return null;
 
   const tab = await getActiveDocTab();
   if (!tab || !tab.url.includes(`docs.google.com/document/d/${docId}`)) return null;
@@ -214,7 +214,7 @@ async function executeReSignOff(docId: string, docTitle: string): Promise<void> 
     const imageHash = await computeImageHash(imageDataUrl);
 
     let revisionId: string;
-    if (STUB_GOOGLE_APIS) {
+    if (E2E_MODE) {
       const hash = await getDocTextHash(docId);
       if (!hash) throw new Error('Cannot get document text hash');
       revisionId = hash;
@@ -389,7 +389,7 @@ async function renderSignedView(
   const changeResults = await Promise.all(
     docData.map(async ({ docRef, latestSignOff }) => {
       try {
-        if (STUB_GOOGLE_APIS) {
+        if (E2E_MODE) {
           const currentHash = await getDocTextHash(docRef.id);
           return currentHash ? currentHash !== latestSignOff!.revisionId : false;
         } else {
@@ -561,7 +561,7 @@ function showTrackedDocDetail(tracked: TrackedDoc, _hasChanged: boolean, parentC
 
       // Get a fresh revision ID for signing (not the baseline)
       let revisionId: string;
-      if (STUB_GOOGLE_APIS) {
+      if (E2E_MODE) {
         const hash = await getDocTextHash(tracked.documentId);
         if (!hash) throw new Error('Cannot get document text hash');
         revisionId = hash;

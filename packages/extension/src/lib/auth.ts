@@ -1,5 +1,3 @@
-import { DEV_MODE, devFakeUser } from './dev-mode';
-
 // Re-export a minimal User type so consumers don't need firebase/auth
 export interface AuthUser {
   uid: string;
@@ -8,42 +6,9 @@ export interface AuthUser {
   getIdToken: () => Promise<string>;
 }
 
-// --- Dev mode implementation ---
+// --- Firebase implementation (lazy-loaded) ---
 
-let devAuthCallback: ((user: AuthUser | null) => void) | null = null;
-let devSignedIn = false;
-
-function devSignIn(): Promise<AuthUser> {
-  devSignedIn = true;
-  const user = devFakeUser as AuthUser;
-  devAuthCallback?.(user);
-  return Promise.resolve(user);
-}
-
-function devSignOut(): Promise<void> {
-  devSignedIn = false;
-  devAuthCallback?.(null);
-  return Promise.resolve();
-}
-
-function devOnAuthChange(callback: (user: AuthUser | null) => void): () => void {
-  devAuthCallback = callback;
-  // Fire immediately with current state
-  setTimeout(() => callback(devSignedIn ? (devFakeUser as AuthUser) : null), 0);
-  return () => { devAuthCallback = null; };
-}
-
-function devGetIdToken(): Promise<string | null> {
-  return Promise.resolve(devSignedIn ? 'dev-token' : null);
-}
-
-function devGetCurrentUser(): AuthUser | null {
-  return devSignedIn ? (devFakeUser as AuthUser) : null;
-}
-
-// --- Real Firebase implementation (lazy-loaded) ---
-
-async function realSignIn(): Promise<AuthUser> {
+export async function signIn(): Promise<AuthUser> {
   const fb = await import('firebase/auth');
   const { getFirebaseAuth } = await import('./firebase-init');
   const auth = getFirebaseAuth();
@@ -65,7 +30,7 @@ async function realSignIn(): Promise<AuthUser> {
   });
 }
 
-async function realSignOut(): Promise<void> {
+export async function signOut(): Promise<void> {
   const fb = await import('firebase/auth');
   const { getFirebaseAuth } = await import('./firebase-init');
   await fb.signOut(getFirebaseAuth());
@@ -74,7 +39,7 @@ async function realSignOut(): Promise<void> {
   });
 }
 
-function realOnAuthChange(callback: (user: AuthUser | null) => void): () => void {
+export function onAuthChange(callback: (user: AuthUser | null) => void): () => void {
   // Dynamic import to avoid loading Firebase at module level
   let unsubscribe: (() => void) | null = null;
   import('firebase/auth').then(async (fb) => {
@@ -86,24 +51,14 @@ function realOnAuthChange(callback: (user: AuthUser | null) => void): () => void
   return () => { unsubscribe?.(); };
 }
 
-async function realGetIdToken(): Promise<string | null> {
+export async function getIdToken(): Promise<string | null> {
   const { getFirebaseAuth } = await import('./firebase-init');
   const user = getFirebaseAuth().currentUser;
   if (!user) return null;
   return user.getIdToken();
 }
 
-async function realGetCurrentUser(): Promise<AuthUser | null> {
+export async function getCurrentUser(): Promise<AuthUser | null> {
   const { getFirebaseAuth } = await import('./firebase-init');
   return getFirebaseAuth().currentUser as unknown as AuthUser | null;
 }
-
-// --- Exports: pick dev or real based on DEV_MODE ---
-
-export const signIn = DEV_MODE ? devSignIn : realSignIn;
-export const signOut = DEV_MODE ? devSignOut : realSignOut;
-export const onAuthChange = DEV_MODE ? devOnAuthChange : realOnAuthChange;
-export const getIdToken = DEV_MODE ? devGetIdToken : realGetIdToken;
-export const getCurrentUser = DEV_MODE
-  ? devGetCurrentUser
-  : realGetCurrentUser;
