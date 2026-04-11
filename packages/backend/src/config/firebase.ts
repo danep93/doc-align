@@ -2,34 +2,34 @@ import admin from 'firebase-admin';
 import type { Auth } from 'firebase-admin/auth';
 import type { Firestore } from 'firebase-admin/firestore';
 
-// The default app uses ADC credentials — connects to whatever project
-// is set via GOOGLE_CLOUD_PROJECT (staging Firestore for local dev).
+// The GOOGLE_CLOUD_PROJECT env var determines which Firestore to use.
+// FIREBASE_AUTH_PROJECT_ID determines which project's tokens to verify
+// (defaults to 'doc-align' since the extension always authenticates there).
+const FIRESTORE_PROJECT = process.env.GOOGLE_CLOUD_PROJECT || 'doc-align';
+const AUTH_PROJECT = process.env.FIREBASE_AUTH_PROJECT_ID || 'doc-align';
+
+// Initialize the main app for Firestore
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.applicationDefault(),
+    projectId: FIRESTORE_PROJECT,
   });
 }
 
-// Firestore: uses the current project (staging locally, prod in production)
 export const db: Firestore = admin.firestore();
 
-// Auth: always verify tokens against the production Firebase project.
-// The Chrome extension always authenticates via the production OAuth client,
-// regardless of which Firestore the backend talks to.
-const AUTH_PROJECT_ID = process.env.FIREBASE_AUTH_PROJECT_ID || 'doc-align';
-
-let authApp: admin.app.App;
-if (AUTH_PROJECT_ID === (process.env.GOOGLE_CLOUD_PROJECT || admin.app().options.projectId)) {
-  // Same project — reuse the default app
-  authApp = admin.app();
+// If auth and firestore use different projects, create a separate app for auth
+let authInstance: Auth;
+if (AUTH_PROJECT === FIRESTORE_PROJECT) {
+  authInstance = admin.auth();
 } else {
-  // Different project — create a secondary app for auth verification
-  authApp = admin.apps.find(a => a?.name === 'auth-app') ||
+  const authApp = admin.apps.find(a => a?.name === 'auth') ||
     admin.initializeApp({
       credential: admin.credential.applicationDefault(),
-      projectId: AUTH_PROJECT_ID,
-    }, 'auth-app');
+      projectId: AUTH_PROJECT,
+    }, 'auth');
+  authInstance = authApp.auth();
 }
 
-export const auth: Auth = authApp.auth();
+export const auth: Auth = authInstance;
 export { admin };

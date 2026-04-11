@@ -28,7 +28,8 @@ export async function authMiddleware(
     req.userId = decoded.uid;
     req.userEmail = decoded.email;
     next();
-  } catch {
+  } catch (err) {
+    console.error('Auth verification failed:', err instanceof Error ? err.message : err);
     res.status(401).json({ error: 'Invalid or expired token' });
   }
 }

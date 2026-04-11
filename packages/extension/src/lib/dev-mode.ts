@@ -1,5 +1,13 @@
-// Dev mode: set to true to bypass Firebase auth and use local storage stubs
-export const DEV_MODE = false;
+// Dev mode: bypasses Firebase auth and uses local storage stubs for everything.
+// E2E mode: uses real Firebase auth + real backend API, but stubs Google Drive/Docs APIs
+//           (since chrome.identity OAuth isn't available in Playwright's Chromium).
+// Set via E2E_MODE=true or DEV_MODE_FLAG=true environment variables at build time.
+declare const __E2E_MODE__: boolean;
+declare const __DEV_MODE_FLAG__: boolean;
+export const DEV_MODE = typeof __DEV_MODE_FLAG__ !== 'undefined' ? __DEV_MODE_FLAG__ : false;
+export const E2E_MODE = typeof __E2E_MODE__ !== 'undefined' ? __E2E_MODE__ : false;
+// Stub Google APIs in both dev and E2E mode (chrome.identity unavailable in both)
+export const STUB_GOOGLE_APIS = DEV_MODE || E2E_MODE;
 
 import type { Signature, SignOff, DocReference, UserProfile, TrackedDoc, Tier } from '@doc-align/shared';
 import { TIER_LIMITS, canTrackDocument } from '@doc-align/shared';

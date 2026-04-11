@@ -22,14 +22,14 @@ env:
   SERVICE_NAME: doc-align-api
 
 jobs:
-  build-and-test:
+  build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.image.outputs.image }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - uses: actions/setup-node@v4
         with:
@@ -37,30 +37,9 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      - run: pnpm run build-all
       - run: pnpm run typecheck
-      - run: pnpm run build-all
       - run: pnpm run test-all
-
-  deploy-staging:
-    needs: build-and-test
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
-    runs-on: ubuntu-latest
-    environment: staging
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run build-all
 
       - id: auth
         uses: google-github-actions/auth@v2
@@ -75,39 +54,59 @@ jobs:
         run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
 
       - name: Build and push Docker image
+        id: image
         run: |
           IMAGE="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_STAGING }}/${{ env.AR_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
-          docker build -t $IMAGE -f packages/backend/Dockerfile .
+          docker build -t $IMAGE .
           docker push $IMAGE
-          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+
+  deploy-staging:
+    needs: build-and-push
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_STAGING }}
 
       - name: Deploy to Cloud Run (staging)
         run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image ${{ env.IMAGE }} \
+            --image ${{ needs.build-and-push.outputs.image }} \
             --project ${{ env.GCP_PROJECT_STAGING }} \
             --region ${{ env.GCP_REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --set-env-vars "GOOGLE_CLOUD_PROJECT=${{ env.GCP_PROJECT_STAGING }}"
+            --set-env-vars "GOOGLE_CLOUD_PROJECT=${{ env.GCP_PROJECT_STAGING }},FIREBASE_AUTH_PROJECT_ID=${{ env.GCP_PROJECT_STAGING }}"
 
-      - name: Show staging URL
+      - name: Verify staging health
         run: |
           URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --project ${{ env.GCP_PROJECT_STAGING }} --region ${{ env.GCP_REGION }} --format='value(status.url)')
           echo "Staging API: $URL/api/health"
+          STATUS=$(curl -sf "$URL/api/health" | jq -r '.status')
+          if [ "$STATUS" != "ok" ]; then
+            echo "Health check failed: $STATUS"
+            exit 1
+          fi
+          echo "Health check passed"
 
-  deploy-production:
-    needs: build-and-test
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
+  e2e-staging:
+    needs: deploy-staging
     runs-on: ubuntu-latest
-    environment: production
+    environment: staging
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - uses: actions/setup-node@v4
         with:
@@ -115,8 +114,24 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run build-all
 
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+        working-directory: packages/e2e
+
+      - name: Run E2E tests against staging
+        run: xvfb-run pnpm run test:e2e
+        env:
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+
+  deploy-production:
+    needs: [build-and-push, e2e-staging]
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
       - id: auth
         uses: google-github-actions/auth@v2
         with:
@@ -126,27 +141,26 @@ jobs:
         with:
           project_id: ${{ env.GCP_PROJECT_PROD }}
 
-      - name: Configure Docker for Artifact Registry
+      - name: Configure Docker for Artifact Registry (pull from staging)
         run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
-
-      - name: Build and push Docker image
-        run: |
-          IMAGE="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_STAGING }}/${{ env.AR_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
-          docker build -t $IMAGE -f packages/backend/Dockerfile .
-          docker push $IMAGE
-          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
 
       - name: Deploy to Cloud Run (production)
         run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image ${{ env.IMAGE }} \
+            --image ${{ needs.build-and-push.outputs.image }} \
             --project ${{ env.GCP_PROJECT_PROD }} \
             --region ${{ env.GCP_REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --set-env-vars "GOOGLE_CLOUD_PROJECT=${{ env.GCP_PROJECT_PROD }}"
+            --set-env-vars "GOOGLE_CLOUD_PROJECT=${{ env.GCP_PROJECT_PROD }},FIREBASE_AUTH_PROJECT_ID=${{ env.GCP_PROJECT_PROD }}"
 
-      - name: Show production URL
+      - name: Verify production health
         run: |
           URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --project ${{ env.GCP_PROJECT_PROD }} --region ${{ env.GCP_REGION }} --format='value(status.url)')
           echo "Production API: $URL/api/health"
+          STATUS=$(curl -sf "$URL/api/health" | jq -r '.status')
+          if [ "$STATUS" != "ok" ]; then
+            echo "Health check failed: $STATUS"
+            exit 1
+          fi
+          echo "Health check passed"

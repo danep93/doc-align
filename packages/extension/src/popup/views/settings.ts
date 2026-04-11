@@ -5,10 +5,28 @@ import { loadThemePreference, saveThemePreference, resolveTheme, applyTheme, typ
 import type { UserProfile } from '@doc-align/shared';
 
 export async function renderSettingsView(container: HTMLElement): Promise<void> {
-  const user = (await api.getUser()) as UserProfile;
+  let user: UserProfile;
+  let hasSignature = false;
+  try {
+    user = (await api.getUser()) as UserProfile;
+    const existingSigs = await api.getSignatures();
+    hasSignature = Array.isArray(existingSigs) && existingSigs.length > 0;
+  } catch (err) {
+    // If API fails, show sign-out button so user isn't stuck
+    container.innerHTML = `
+      <div class="empty-state">
+        <p>Failed to load settings.</p>
+        <p style="font-size:11px;color:var(--color-text-muted);margin-bottom:16px;">${err instanceof Error ? err.message : 'Unknown error'}</p>
+        <button class="btn btn-ghost" id="sign-out-btn" style="width:100%;color:var(--color-danger);">Sign Out</button>
+      </div>
+    `;
+    document.getElementById('sign-out-btn')?.addEventListener('click', async () => {
+      await signOut();
+      window.location.reload();
+    });
+    return;
+  }
   const currentTheme = await loadThemePreference();
-  const existingSigs = await api.getSignatures();
-  const hasSignature = Array.isArray(existingSigs) && existingSigs.length > 0;
   // If stored as 'system', default to 'dark'
   const effectiveTheme = currentTheme === 'system' ? 'dark' : currentTheme;
 

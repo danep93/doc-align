@@ -12,8 +12,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - uses: actions/setup-node@v4
         with:
@@ -22,11 +20,21 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Typecheck all packages
-        run: pnpm run typecheck
-
       - name: Build all packages
         run: pnpm run build-all
 
-      - name: Run tests
+      - name: Typecheck all packages
+        run: pnpm run typecheck
+
+      - name: Run unit tests
         run: pnpm run test-all
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+        working-directory: packages/e2e
+
+      - name: Run E2E tests
+        run: xvfb-run pnpm run test:e2e
+        env:
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}

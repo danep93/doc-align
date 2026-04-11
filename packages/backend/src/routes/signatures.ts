@@ -32,7 +32,8 @@ router.post('/', tierMiddleware, async (req: TierRequest, res) => {
   try {
     const signature = await createSignature(req.userId!, parsed.data);
     res.status(201).json(signature);
-  } catch {
+  } catch (err) {
+    console.error('Failed to create signature:', err);
     res.status(500).json({ error: 'Failed to create signature' });
   }
 });

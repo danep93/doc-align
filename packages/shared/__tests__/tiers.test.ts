@@ -13,9 +13,9 @@ describe('TIER_LIMITS', () => {
     expect(TIER_LIMITS.free.maxTrackedDocuments).toBe(5);
   });
 
-  it('pro tier has unlimited sign-offs and docs', () => {
+  it('pro tier has unlimited sign-offs and 500 tracked docs', () => {
     expect(TIER_LIMITS.pro.maxSignOffsPerMonth).toBe(Infinity);
-    expect(TIER_LIMITS.pro.maxTrackedDocuments).toBe(Infinity);
+    expect(TIER_LIMITS.pro.maxTrackedDocuments).toBe(500);
   });
 });
 
