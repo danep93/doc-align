@@ -59,7 +59,6 @@ module.exports = (env, argv) => {
         ),
         'process.env.FIREBASE_PROJECT_ID': JSON.stringify(firebaseProjectId),
         '__E2E_MODE__': JSON.stringify(process.env.E2E_MODE === 'true'),
-        '__DEV_MODE_FLAG__': JSON.stringify(process.env.DEV_MODE === 'true'),
       }),
     ],
     devtool: isProduction ? false : 'inline-source-map',

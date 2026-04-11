@@ -1,4 +1,3 @@
-import { DEV_MODE, devApi } from './dev-mode';
 import { getIdToken, getCurrentUser } from './auth';
 import { deleteSnapshot } from './google-apis';
 import { TIER_LIMITS } from '@doc-align/shared';
@@ -510,4 +509,4 @@ const proxyApi = {
   },
 };
 
-export const api = DEV_MODE ? devApi : proxyApi;
+export const api = proxyApi;
