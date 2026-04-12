@@ -10,6 +10,7 @@ import signoffsRouter from './routes/signoffs';
 import subscriptionsRouter from './routes/subscriptions';
 import organizationRoutes from './routes/organizations';
 import groupRoutes from './routes/groups';
+import signoffRulesRoutes from './routes/signoffRules';
 import trackedDocsRouter from './routes/trackedDocs';
 
 const app: Express = express();
@@ -47,6 +48,7 @@ app.use('/api/signoffs', authMiddleware, signoffsRouter);
 app.use('/api/tracked-docs', authMiddleware, trackedDocsRouter);
 app.use('/api/organizations', authMiddleware, organizationRoutes);
 app.use('/api/organizations/:orgId/groups', authMiddleware, groupRoutes);
+app.use('/api/organizations/:orgId/signoff-rules', authMiddleware, signoffRulesRoutes);
 
 // Subscriptions: checkout is protected, webhook is not
 app.use('/api/subscriptions', subscriptionsRouter);
