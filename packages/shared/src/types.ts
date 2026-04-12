@@ -130,3 +130,44 @@ export interface GroupResponse {
   memberCount: number;
   createdAt: string;
 }
+
+export interface SignoffRule {
+  groupId: string;
+  groupName: string;
+  minMembers: number;
+  requireLeader: boolean;
+}
+
+export interface SignoffRuleset {
+  id: string;
+  organizationId: string;
+  documentId: string | null;
+  rules: SignoffRule[];
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrgDocument {
+  id: string;
+  organizationId: string;
+  documentId: string;
+  title: string;
+  addedById: string;
+  addedAt: string;
+}
+
+export interface RuleStatusEntry {
+  groupId: string;
+  groupName: string;
+  minMembers: number;
+  requireLeader: boolean;
+  memberSignoffs: { userId: string; name: string; signedAt: string }[];
+  leaderSignedOff: boolean;
+  fulfilled: boolean;
+}
+
+export interface RuleStatus {
+  rules: RuleStatusEntry[];
+  allFulfilled: boolean;
+}
