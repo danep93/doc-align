@@ -173,7 +173,7 @@ router.put('/documents/:documentId', async (req: AuthenticatedRequest, res) => {
   }
 });
 
-// DELETE /documents/:documentId — reset doc rules to org defaults / remove from org
+// DELETE /documents/:documentId — reset doc rules to org defaults only
 router.delete('/documents/:documentId', async (req: AuthenticatedRequest, res) => {
   try {
     const orgId = req.params.orgId!;
@@ -189,6 +189,28 @@ router.delete('/documents/:documentId', async (req: AuthenticatedRequest, res) =
     }
 
     await resetDocRules(orgId, documentId);
+    res.json({ success: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    res.status(500).json({ error: message });
+  }
+});
+
+// DELETE /documents/:documentId/remove — remove doc from org entirely
+router.delete('/documents/:documentId/remove', async (req: AuthenticatedRequest, res) => {
+  try {
+    const orgId = req.params.orgId!;
+    const documentId = req.params.documentId!;
+    const allowed = await checkPermission({
+      userId: req.userId!,
+      orgId,
+      action: 'org:edit',
+    });
+    if (!allowed) {
+      res.status(403).json({ error: 'Permission denied' });
+      return;
+    }
+
     await removeOrgDocument(orgId, documentId);
     res.json({ success: true });
   } catch (err) {

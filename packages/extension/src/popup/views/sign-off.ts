@@ -5,7 +5,7 @@ import { renderSignatureImage, computeImageHash } from '../../lib/signature-rend
 import { invalidateTab } from '../popup';
 import { ensureContentScript, getActiveDocTab } from '../../lib/inject-content-script';
 import { TIER_LIMITS, canTrackDocument } from '@doc-align/shared';
-import type { Signature, SignOff, UserProfile, Tier, TrackedDoc, RuleStatus, RuleStatusEntry, Organization } from '@doc-align/shared';
+import type { Signature, SignOff, UserProfile, Tier, TrackedDoc, RuleStatus, RuleStatusEntry, Organization, OrgDocument } from '@doc-align/shared';
 
 interface DocContext {
   docId: string;
@@ -34,10 +34,13 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
 
   let ruleStatus: RuleStatus | null = null;
   let userOrg: Organization | null = null;
+  let isDocInOrg = false;
   try {
     const orgs = await api.getMyOrgs();
     userOrg = orgs[0] || null;
     if (userOrg && docContext) {
+      const orgDocs = await api.getOrgDocuments(userOrg.id) as OrgDocument[];
+      isDocInOrg = orgDocs.some((d) => d.documentId === docContext!.docId);
       ruleStatus = await api.getDocRuleStatus(userOrg.id, docContext.docId);
     }
   } catch {
@@ -64,24 +67,28 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
 
   // Build progress section HTML
   let progressHtml = '';
-  if (ruleStatus && ruleStatus.rules.length > 0) {
+  if (ruleStatus && isDocInOrg && ruleStatus.rules.length > 0) {
     const ruleLines = ruleStatus.rules.map((rule: RuleStatusEntry) => {
       const icon = rule.fulfilled ? '&#10003;' : '&#10007;';
       const color = rule.fulfilled ? 'var(--color-success, #22c55e)' : 'var(--color-text-muted, #888)';
       let detail: string;
+      const formatSignoffDate = (signedAt: string) => {
+        return new Date(signedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      };
       if (rule.requireLeader) {
         detail = rule.leaderSignedOff
-          ? escapeHtml(rule.memberSignoffs[0]?.name || 'Leader')
+          ? escapeHtml(rule.memberSignoffs[0]?.name || 'Leader') + (rule.memberSignoffs[0]?.signedAt ? ` — ${formatSignoffDate(rule.memberSignoffs[0].signedAt)}` : '')
           : 'Awaiting leader sign-off';
       } else {
         const count = rule.memberSignoffs.length;
         if (count >= rule.minMembers) {
-          detail = rule.memberSignoffs.map(s => escapeHtml(s.name)).join(', ');
+          detail = rule.memberSignoffs.map(s => `${escapeHtml(s.name)} — ${formatSignoffDate(s.signedAt)}`).join(', ');
         } else {
           const needed = rule.minMembers - count;
+          const signedNames = rule.memberSignoffs.map(s => `${escapeHtml(s.name)} — ${formatSignoffDate(s.signedAt)}`).join(', ');
           detail = needed === rule.minMembers
             ? `Needs ${needed} member${needed > 1 ? 's' : ''}`
-            : `${rule.memberSignoffs.map(s => escapeHtml(s.name)).join(', ')} — needs ${needed} more`;
+            : `${signedNames} — needs ${needed} more`;
         }
       }
       const label = rule.requireLeader
@@ -109,7 +116,7 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
 
   // Build "add to org" button HTML
   let addToOrgHtml = '';
-  if (userOrg && !ruleStatus && docContext) {
+  if (userOrg && docContext && !isDocInOrg) {
     addToOrgHtml = `
       <div style="margin-bottom:12px;">
         <button class="btn btn-ghost" id="add-to-org-btn" style="width:100%;font-size:12px;">Add to ${escapeHtml(userOrg.name)} for sign-off tracking</button>
@@ -125,8 +132,7 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
       // Check which rules would become fulfilled if user signs
       // We approximate by checking rules that need exactly 1 more member
       const wouldComplete = unfulfilled.filter((r: RuleStatusEntry) => {
-        if (r.requireLeader) return !r.leaderSignedOff;
-        return r.memberSignoffs.length === r.minMembers - 1;
+        return !r.requireLeader && r.memberSignoffs.length === r.minMembers - 1;
       });
       if (wouldComplete.length > 0) {
         ruleContext = ` — completes ${wouldComplete.map(r => escapeHtml(r.groupName)).join(', ')} requirement`;

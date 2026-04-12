@@ -409,7 +409,7 @@ const realApi = {
   getOrgDocuments: (orgId: string) =>
     request<OrgDocument[]>(`/organizations/${orgId}/signoff-rules/documents`),
   removeOrgDocument: (orgId: string, documentId: string) =>
-    request<void>(`/organizations/${orgId}/signoff-rules/documents/${documentId}`, { method: 'DELETE' }),
+    request<void>(`/organizations/${orgId}/signoff-rules/documents/${documentId}/remove`, { method: 'DELETE' }),
 };
 
 // Proxy that resolves the backend on first call

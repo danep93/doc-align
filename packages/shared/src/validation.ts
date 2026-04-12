@@ -111,7 +111,7 @@ export const SignoffRuleSchema = z.object({
 });
 
 export const UpdateSignoffRulesSchema = z.object({
-  rules: z.array(SignoffRuleSchema).min(1),
+  rules: z.array(SignoffRuleSchema),
 });
 
 export const AddOrgDocumentSchema = z.object({
