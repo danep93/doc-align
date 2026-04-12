@@ -54,7 +54,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "organizationId", "order": "ASCENDING" },
-        { "fieldPath": "managerId", "order": "ASCENDING" }
+        { "fieldPath": "leaderId", "order": "ASCENDING" }
       ]
     },
     {

@@ -35,8 +35,7 @@ router.post('/', async (req: AuthenticatedRequest, res) => {
       orgId,
       parsed.data.name,
       req.userId!,
-      parsed.data.directorId,
-      parsed.data.managerId,
+      parsed.data.leaderId,
     );
     res.status(201).json(group);
   } catch (err) {

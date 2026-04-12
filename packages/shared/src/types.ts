@@ -91,8 +91,7 @@ export interface Group {
   id: string;
   organizationId: string;
   name: string;
-  directorId?: string;
-  managerId?: string;
+  leaderId?: string;
   createdById: string;
   createdAt: string;
 }
@@ -127,8 +126,7 @@ export interface OrgMemberResponse {
 export interface GroupResponse {
   id: string;
   name: string;
-  directorName?: string;
-  managerName?: string;
+  leaderName?: string;
   memberCount: number;
   createdAt: string;
 }

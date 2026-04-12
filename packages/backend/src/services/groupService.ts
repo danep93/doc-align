@@ -14,17 +14,15 @@ async function getUserDisplayName(userId: string): Promise<string | undefined> {
 }
 
 async function enrichGroup(group: Group): Promise<GroupResponse> {
-  const [directorName, managerName, memberCountSnap] = await Promise.all([
-    group.directorId ? getUserDisplayName(group.directorId) : Promise.resolve(undefined),
-    group.managerId ? getUserDisplayName(group.managerId) : Promise.resolve(undefined),
+  const [leaderName, memberCountSnap] = await Promise.all([
+    group.leaderId ? getUserDisplayName(group.leaderId) : Promise.resolve(undefined),
     db.collection(GROUP_MEMBERS).where('groupId', '==', group.id).get(),
   ]);
 
   return {
     id: group.id,
     name: group.name,
-    directorName,
-    managerName,
+    leaderName,
     memberCount: memberCountSnap.size,
     createdAt: group.createdAt,
   };
@@ -34,8 +32,7 @@ export async function createGroup(
   orgId: string,
   name: string,
   createdById: string,
-  directorId?: string,
-  managerId?: string,
+  leaderId?: string,
 ): Promise<Group> {
   const ref = db.collection(GROUPS).doc();
   const now = new Date().toISOString();
@@ -46,8 +43,7 @@ export async function createGroup(
     name,
     createdById,
     createdAt: now,
-    ...(directorId !== undefined && { directorId }),
-    ...(managerId !== undefined && { managerId }),
+    ...(leaderId !== undefined && { leaderId }),
   };
 
   await ref.set(group);
@@ -94,7 +90,7 @@ export async function getGroupsForUser(orgId: string, userId: string): Promise<G
 
 export async function updateGroup(
   groupId: string,
-  data: { name?: string; directorId?: string | null; managerId?: string | null },
+  data: { name?: string; leaderId?: string | null },
 ): Promise<void> {
   const updateData: Record<string, unknown> = {};
 
@@ -102,16 +98,10 @@ export async function updateGroup(
     updateData.name = data.name;
   }
 
-  if (data.directorId === null) {
-    updateData.directorId = FieldValue.delete();
-  } else if (data.directorId !== undefined) {
-    updateData.directorId = data.directorId;
-  }
-
-  if (data.managerId === null) {
-    updateData.managerId = FieldValue.delete();
-  } else if (data.managerId !== undefined) {
-    updateData.managerId = data.managerId;
+  if (data.leaderId === null) {
+    updateData.leaderId = FieldValue.delete();
+  } else if (data.leaderId !== undefined) {
+    updateData.leaderId = data.leaderId;
   }
 
   if (Object.keys(updateData).length > 0) {

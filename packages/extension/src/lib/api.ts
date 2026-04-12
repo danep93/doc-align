@@ -357,9 +357,9 @@ const realApi = {
   declineInvite: (inviteId: string) =>
     request<void>(`/users/me/invites/${inviteId}/decline`, { method: 'POST' }),
   getOrgGroups: (orgId: string) => request<GroupResponse[]>(`/organizations/${orgId}/groups`),
-  createGroup: (orgId: string, data: { name: string; directorId?: string; managerId?: string }) =>
+  createGroup: (orgId: string, data: { name: string; leaderId?: string }) =>
     request<Group>(`/organizations/${orgId}/groups`, { method: 'POST', body: JSON.stringify(data) }),
-  updateGroup: (orgId: string, groupId: string, data: { name?: string; directorId?: string; managerId?: string }) =>
+  updateGroup: (orgId: string, groupId: string, data: { name?: string; leaderId?: string }) =>
     request<void>(`/organizations/${orgId}/groups/${groupId}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteGroup: (orgId: string, groupId: string) =>
     request<void>(`/organizations/${orgId}/groups/${groupId}`, { method: 'DELETE' }),
@@ -472,12 +472,12 @@ const proxyApi = {
     if (a === localApi) throw new Error('Groups require backend connection');
     return a.getOrgGroups(orgId);
   },
-  createGroup: async (orgId: string, data: { name: string; directorId?: string; managerId?: string }) => {
+  createGroup: async (orgId: string, data: { name: string; leaderId?: string }) => {
     const a = await getApi();
     if (a === localApi) throw new Error('Groups require backend connection');
     return a.createGroup(orgId, data);
   },
-  updateGroup: async (orgId: string, groupId: string, data: { name?: string; directorId?: string; managerId?: string }) => {
+  updateGroup: async (orgId: string, groupId: string, data: { name?: string; leaderId?: string }) => {
     const a = await getApi();
     if (a === localApi) throw new Error('Groups require backend connection');
     return a.updateGroup(orgId, groupId, data);

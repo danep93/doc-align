@@ -148,7 +148,7 @@ export async function removeOrgMember(
     throw new Error('Cannot remove organization owner');
   }
 
-  // Check if user is managerId or directorId on any group in this org
+  // Check if user is leaderId on any group in this org
   const groupsSnapshot = await db
     .collection(GROUPS)
     .where('organizationId', '==', orgId)
@@ -157,7 +157,7 @@ export async function removeOrgMember(
   const assignedGroups: string[] = [];
   for (const groupDoc of groupsSnapshot.docs) {
     const group = groupDoc.data();
-    if (group.managerId === userId || group.directorId === userId) {
+    if (group.leaderId === userId) {
       assignedGroups.push(group.name);
     }
   }

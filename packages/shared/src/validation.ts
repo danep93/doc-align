@@ -81,14 +81,12 @@ export const UpdateOrganizationSchema = z.object({
 
 export const CreateGroupSchema = z.object({
   name: z.string().min(1).max(100).regex(/^[\w\s\-.,&'()]+$/, 'Name contains invalid characters'),
-  directorId: z.string().optional(),
-  managerId: z.string().optional(),
+  leaderId: z.string().optional(),
 });
 
 export const UpdateGroupSchema = z.object({
   name: z.string().min(1).max(100).regex(/^[\w\s\-.,&'()]+$/, 'Name contains invalid characters').optional(),
-  directorId: z.string().nullable().optional(),
-  managerId: z.string().nullable().optional(),
+  leaderId: z.string().nullable().optional(),
 });
 
 export const CreateInviteSchema = z.object({

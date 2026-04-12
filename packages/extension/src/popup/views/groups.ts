@@ -253,8 +253,8 @@ async function renderOrgView(container: HTMLElement, org: Organization): Promise
     card.className = 'group-card';
 
     let metaParts: string[] = [];
-    if (group.managerName) {
-      metaParts.push(`Manager: ${escapeHtml(group.managerName)}`);
+    if (group.leaderName) {
+      metaParts.push(`Leader: ${escapeHtml(group.leaderName)}`);
     }
     metaParts.push(`${group.memberCount} ${group.memberCount === 1 ? 'member' : 'members'}`);
 

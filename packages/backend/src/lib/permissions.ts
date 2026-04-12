@@ -47,7 +47,7 @@ export async function checkPermission(ctx: PermissionContext): Promise<boolean> 
       const groupDoc = await db.collection('groups').doc(ctx.groupId).get();
       if (!groupDoc.exists) return false;
       const group = groupDoc.data()!;
-      const ownsGroup = group.directorId === ctx.userId || group.createdById === ctx.userId;
+      const ownsGroup = group.leaderId === ctx.userId || group.createdById === ctx.userId;
       if (!ownsGroup) return false;
 
       const groupActions: Action[] = [
@@ -59,27 +59,27 @@ export async function checkPermission(ctx: PermissionContext): Promise<boolean> 
     return false;
   }
 
-  // Member permissions — check if they're a group manager
+  // Member permissions — check if they're a group leader
   if (role === 'member' && ctx.groupId) {
     const groupDoc = await db.collection('groups').doc(ctx.groupId).get();
     if (!groupDoc.exists) return false;
     const group = groupDoc.data()!;
-    if (group.managerId !== ctx.userId) return false;
+    if (group.leaderId !== ctx.userId) return false;
 
-    const managerActions: Action[] = [
+    const leaderActions: Action[] = [
       'group:add_member', 'group:remove_member', 'group:view_members',
     ];
-    return managerActions.includes(ctx.action);
+    return leaderActions.includes(ctx.action);
   }
 
-  // Search members — group managers get this
+  // Search members — group leaders get this
   if (role === 'member' && ctx.action === 'org:search_members') {
-    const managedGroups = await db.collection('groups')
+    const ledGroups = await db.collection('groups')
       .where('organizationId', '==', ctx.orgId)
-      .where('managerId', '==', ctx.userId)
+      .where('leaderId', '==', ctx.userId)
       .limit(1)
       .get();
-    return !managedGroups.empty;
+    return !ledGroups.empty;
   }
 
   return false;
