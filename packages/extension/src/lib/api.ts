@@ -1,7 +1,7 @@
 import { getIdToken, getCurrentUser } from './auth';
 import { deleteSnapshot } from './google-apis';
 import { TIER_LIMITS } from '@doc-align/shared';
-import type { Signature, SignOff, DocReference, UserProfile, Tier, TrackedDoc, Organization, OrgMemberResponse, OrgRole, Invite, GroupResponse, Group } from '@doc-align/shared';
+import type { Signature, SignOff, DocReference, UserProfile, Tier, TrackedDoc, Organization, OrgMemberResponse, OrgRole, Invite, GroupResponse, Group, SignoffRuleset, SignoffRule, OrgDocument, RuleStatus } from '@doc-align/shared';
 import { canTrackDocument } from '@doc-align/shared';
 
 declare const process: { env: { API_BASE?: string } };
@@ -276,6 +276,17 @@ const localApi = {
   addGroupMember: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
   removeGroupMember: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
   leaveGroup: async (): Promise<never> => { throw new Error('Groups require backend connection'); },
+
+  // Sign-off rules — not available in local mode
+  getOrgDefaultRules: async (): Promise<never> => { throw new Error('Sign-off rules require backend connection'); },
+  setOrgDefaultRules: async (): Promise<never> => { throw new Error('Sign-off rules require backend connection'); },
+  getDocRules: async (): Promise<never> => { throw new Error('Sign-off rules require backend connection'); },
+  setDocRules: async (): Promise<never> => { throw new Error('Sign-off rules require backend connection'); },
+  resetDocRules: async (): Promise<never> => { throw new Error('Sign-off rules require backend connection'); },
+  getDocRuleStatus: async (): Promise<never> => { throw new Error('Sign-off rules require backend connection'); },
+  addOrgDocument: async (): Promise<never> => { throw new Error('Sign-off rules require backend connection'); },
+  getOrgDocuments: async (): Promise<never> => { throw new Error('Sign-off rules require backend connection'); },
+  removeOrgDocument: async (): Promise<never> => { throw new Error('Sign-off rules require backend connection'); },
 };
 
 // --- Backend API with local fallback ---
@@ -371,6 +382,34 @@ const realApi = {
     request<void>(`/organizations/${orgId}/groups/${groupId}/members/${userId}`, { method: 'DELETE' }),
   leaveGroup: (orgId: string, groupId: string) =>
     request<void>(`/organizations/${orgId}/groups/${groupId}/members/me/leave`, { method: 'POST' }),
+
+  // Sign-off rules
+  getOrgDefaultRules: (orgId: string) =>
+    request<SignoffRuleset>(`/organizations/${orgId}/signoff-rules`),
+  setOrgDefaultRules: (orgId: string, rules: SignoffRule[]) =>
+    request<SignoffRuleset>(`/organizations/${orgId}/signoff-rules`, {
+      method: 'PUT', body: JSON.stringify({ rules }),
+    }),
+  getDocRules: (orgId: string, documentId: string) =>
+    request<SignoffRuleset>(`/organizations/${orgId}/signoff-rules/documents/${documentId}`),
+  setDocRules: (orgId: string, documentId: string, rules: SignoffRule[]) =>
+    request<SignoffRuleset>(`/organizations/${orgId}/signoff-rules/documents/${documentId}`, {
+      method: 'PUT', body: JSON.stringify({ rules }),
+    }),
+  resetDocRules: (orgId: string, documentId: string) =>
+    request<void>(`/organizations/${orgId}/signoff-rules/documents/${documentId}`, { method: 'DELETE' }),
+  getDocRuleStatus: (orgId: string, documentId: string) =>
+    request<RuleStatus>(`/organizations/${orgId}/signoff-rules/documents/${documentId}/status`),
+
+  // Org documents
+  addOrgDocument: (orgId: string, documentId: string, title: string) =>
+    request<OrgDocument>(`/organizations/${orgId}/signoff-rules/documents`, {
+      method: 'POST', body: JSON.stringify({ documentId, title }),
+    }),
+  getOrgDocuments: (orgId: string) =>
+    request<OrgDocument[]>(`/organizations/${orgId}/signoff-rules/documents`),
+  removeOrgDocument: (orgId: string, documentId: string) =>
+    request<void>(`/organizations/${orgId}/signoff-rules/documents/${documentId}`, { method: 'DELETE' }),
 };
 
 // Proxy that resolves the backend on first call
@@ -506,6 +545,44 @@ const proxyApi = {
     const a = await getApi();
     if (a === localApi) throw new Error('Groups require backend connection');
     return a.leaveGroup(orgId, groupId);
+  },
+
+  // Sign-off rules
+  getOrgDefaultRules: async (orgId: string) => {
+    const a = await getApi();
+    return a.getOrgDefaultRules(orgId);
+  },
+  setOrgDefaultRules: async (orgId: string, rules: SignoffRule[]) => {
+    const a = await getApi();
+    return a.setOrgDefaultRules(orgId, rules);
+  },
+  getDocRules: async (orgId: string, documentId: string) => {
+    const a = await getApi();
+    return a.getDocRules(orgId, documentId);
+  },
+  setDocRules: async (orgId: string, documentId: string, rules: SignoffRule[]) => {
+    const a = await getApi();
+    return a.setDocRules(orgId, documentId, rules);
+  },
+  resetDocRules: async (orgId: string, documentId: string) => {
+    const a = await getApi();
+    return a.resetDocRules(orgId, documentId);
+  },
+  getDocRuleStatus: async (orgId: string, documentId: string) => {
+    const a = await getApi();
+    return a.getDocRuleStatus(orgId, documentId);
+  },
+  addOrgDocument: async (orgId: string, documentId: string, title: string) => {
+    const a = await getApi();
+    return a.addOrgDocument(orgId, documentId, title);
+  },
+  getOrgDocuments: async (orgId: string) => {
+    const a = await getApi();
+    return a.getOrgDocuments(orgId);
+  },
+  removeOrgDocument: async (orgId: string, documentId: string) => {
+    const a = await getApi();
+    return a.removeOrgDocument(orgId, documentId);
   },
 };
 
