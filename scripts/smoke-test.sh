@@ -1,25 +1,31 @@
 #!/bin/bash
 set -e
 
+ENV="${1:-staging}"
 SMOKE_DOC="https://docs.google.com/document/d/13fIjJw6vNoUEg0FDjVcjhNgDg1hsdmdAPVAUGHGJZvU/edit"
 EXTENSION_DIR="$(cd "$(dirname "$0")/../packages/extension/dist" && pwd)"
-SMOKE_PROFILE="/tmp/doc-align-smoke-test"
+SMOKE_PROFILE="/tmp/doc-align-smoke-$ENV"
 
 # Clean previous smoke test profile
 rm -rf "$SMOKE_PROFILE"
 
-echo ""
-echo "=== doc-align Smoke Test ==="
-echo ""
-echo "Building extension with staging config..."
 cd "$(dirname "$0")/.."
-pnpm run build:extension:staging > /dev/null 2>&1
+
+echo ""
+echo "=== doc-align Smoke Test ($ENV) ==="
+echo ""
+echo "Building extension with $ENV config..."
+if [ "$ENV" = "production" ] || [ "$ENV" = "prod" ]; then
+  pnpm run build:extension:prod > /dev/null 2>&1
+else
+  pnpm run build:extension:staging > /dev/null 2>&1
+fi
 echo "Build complete."
 echo ""
 echo "Launching Chrome with the extension and test doc..."
 echo ""
 echo "------------------------------------------------------------"
-echo "  SMOKE TEST CHECKLIST"
+echo "  SMOKE TEST CHECKLIST ($ENV)"
 echo "------------------------------------------------------------"
 echo ""
 echo "  1. SIGN IN"
