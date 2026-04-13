@@ -24,6 +24,7 @@ export async function getOrgDefaultRules(orgId: string): Promise<SignoffRuleset 
 export async function setOrgDefaultRules(
   orgId: string,
   rules: SignoffRule[],
+  connectors: ('AND' | 'OR')[],
   userId: string,
 ): Promise<SignoffRuleset> {
   const existing = await getOrgDefaultRules(orgId);
@@ -32,6 +33,7 @@ export async function setOrgDefaultRules(
   if (existing) {
     const updated: Partial<SignoffRuleset> = {
       rules,
+      connectors,
       updatedAt: now,
     };
     await db.collection(SIGNOFF_RULESETS).doc(existing.id).update(updated);
@@ -44,6 +46,7 @@ export async function setOrgDefaultRules(
     organizationId: orgId,
     documentId: null,
     rules,
+    connectors,
     createdById: userId,
     createdAt: now,
     updatedAt: now,
@@ -75,6 +78,7 @@ export async function setDocRules(
   orgId: string,
   documentId: string,
   rules: SignoffRule[],
+  connectors: ('AND' | 'OR')[],
   userId: string,
 ): Promise<SignoffRuleset> {
   const existing = await getDocRules(orgId, documentId);
@@ -83,6 +87,7 @@ export async function setDocRules(
   if (existing) {
     const updated: Partial<SignoffRuleset> = {
       rules,
+      connectors,
       updatedAt: now,
     };
     await db.collection(SIGNOFF_RULESETS).doc(existing.id).update(updated);
@@ -95,6 +100,7 @@ export async function setDocRules(
     organizationId: orgId,
     documentId,
     rules,
+    connectors,
     createdById: userId,
     createdAt: now,
     updatedAt: now,
@@ -134,7 +140,7 @@ export async function addOrgDocument(
   // Copy org defaults to doc-specific rules
   const defaults = await getOrgDefaultRules(orgId);
   if (defaults) {
-    await setDocRules(orgId, documentId, defaults.rules, userId);
+    await setDocRules(orgId, documentId, defaults.rules, defaults.connectors, userId);
   }
 
   return orgDoc;
@@ -186,10 +192,27 @@ async function getUserDisplayName(userId: string): Promise<string> {
   return data?.displayName ?? data?.email ?? userId;
 }
 
+function computeAllFulfilled(statuses: { fulfilled: boolean }[], connectors: ('AND' | 'OR')[]): boolean {
+  if (statuses.length === 0) return true;
+  if (statuses.length === 1) return statuses[0]!.fulfilled;
+  let result = false;
+  let currentAndGroup = statuses[0]!.fulfilled;
+  for (let i = 0; i < connectors.length; i++) {
+    if (connectors[i] === 'AND') {
+      currentAndGroup = currentAndGroup && statuses[i + 1]!.fulfilled;
+    } else {
+      result = result || currentAndGroup;
+      currentAndGroup = statuses[i + 1]!.fulfilled;
+    }
+  }
+  result = result || currentAndGroup;
+  return result;
+}
+
 export async function getRuleStatus(orgId: string, documentId: string): Promise<RuleStatus> {
   const ruleset = await getEffectiveRules(orgId, documentId);
   if (!ruleset) {
-    return { rules: [], allFulfilled: true };
+    return { rules: [], connectors: [], allFulfilled: true };
   }
 
   // Get all signoffs for the document
@@ -242,15 +265,18 @@ export async function getRuleStatus(orgId: string, documentId: string): Promise<
       ? signoffs.some((s) => s.userId === leaderId)
       : false;
 
-    const memberCountMet = uniqueMemberSignoffs.length >= rule.minMembers;
-    const leaderMet = !rule.requireLeader || leaderSignedOff;
-    const fulfilled = memberCountMet && leaderMet;
+    let fulfilled: boolean;
+    if (rule.type === 'leader') {
+      fulfilled = leaderSignedOff;
+    } else {
+      fulfilled = uniqueMemberSignoffs.length >= (rule.minMembers ?? 1);
+    }
 
     ruleEntries.push({
       groupId: rule.groupId,
       groupName: rule.groupName,
+      type: rule.type,
       minMembers: rule.minMembers,
-      requireLeader: rule.requireLeader,
       memberSignoffs: uniqueMemberSignoffs,
       leaderSignedOff,
       fulfilled,
@@ -259,6 +285,7 @@ export async function getRuleStatus(orgId: string, documentId: string): Promise<
 
   return {
     rules: ruleEntries,
-    allFulfilled: ruleEntries.every((r) => r.fulfilled),
+    connectors: ruleset.connectors,
+    allFulfilled: computeAllFulfilled(ruleEntries, ruleset.connectors),
   };
 }

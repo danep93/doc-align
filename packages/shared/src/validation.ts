@@ -106,12 +106,13 @@ export const ChangeRoleSchema = z.object({
 export const SignoffRuleSchema = z.object({
   groupId: z.string().min(1),
   groupName: z.string().min(1),
-  minMembers: z.number().int().min(1),
-  requireLeader: z.boolean(),
+  type: z.enum(['members', 'leader']),
+  minMembers: z.number().int().min(1).optional(),
 });
 
 export const UpdateSignoffRulesSchema = z.object({
   rules: z.array(SignoffRuleSchema),
+  connectors: z.array(z.enum(['AND', 'OR'])),
 });
 
 export const AddOrgDocumentSchema = z.object({

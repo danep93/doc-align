@@ -68,37 +68,42 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
   // Build progress section HTML
   let progressHtml = '';
   if (ruleStatus && isDocInOrg && ruleStatus.rules.length > 0) {
-    const ruleLines = ruleStatus.rules.map((rule: RuleStatusEntry) => {
+    const ruleLines = ruleStatus.rules.map((rule: RuleStatusEntry, idx: number) => {
       const icon = rule.fulfilled ? '&#10003;' : '&#10007;';
       const color = rule.fulfilled ? 'var(--color-success, #22c55e)' : 'var(--color-text-muted, #888)';
       let detail: string;
       const formatSignoffDate = (signedAt: string) => {
         return new Date(signedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       };
-      if (rule.requireLeader) {
+      if (rule.type === 'leader') {
         detail = rule.leaderSignedOff
           ? escapeHtml(rule.memberSignoffs[0]?.name || 'Leader') + (rule.memberSignoffs[0]?.signedAt ? ` — ${formatSignoffDate(rule.memberSignoffs[0].signedAt)}` : '')
           : 'Awaiting leader sign-off';
       } else {
+        const minMembers = rule.minMembers ?? 1;
         const count = rule.memberSignoffs.length;
-        if (count >= rule.minMembers) {
+        if (count >= minMembers) {
           detail = rule.memberSignoffs.map(s => `${escapeHtml(s.name)} — ${formatSignoffDate(s.signedAt)}`).join(', ');
         } else {
-          const needed = rule.minMembers - count;
+          const needed = minMembers - count;
           const signedNames = rule.memberSignoffs.map(s => `${escapeHtml(s.name)} — ${formatSignoffDate(s.signedAt)}`).join(', ');
-          detail = needed === rule.minMembers
+          detail = needed === minMembers
             ? `Needs ${needed} member${needed > 1 ? 's' : ''}`
             : `${signedNames} — needs ${needed} more`;
         }
       }
-      const label = rule.requireLeader
+      const label = rule.type === 'leader'
         ? `${escapeHtml(rule.groupName)} Leader`
-        : `${escapeHtml(rule.groupName)} (${rule.memberSignoffs.length}/${rule.minMembers})`;
+        : `${escapeHtml(rule.groupName)} (${rule.memberSignoffs.length}/${rule.minMembers ?? 1})`;
+      // Show connector between rules
+      const connectorHtml = idx < ruleStatus.rules.length - 1 && ruleStatus.connectors[idx]
+        ? `<div style="text-align:center;font-size:10px;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:1px;margin:2px 0;">${ruleStatus.connectors[idx]}</div>`
+        : '';
       return `<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:4px;">
         <span style="color:${color};font-weight:600;">${icon}</span>
         <span style="font-size:12px;font-weight:500;">${label}</span>
         <span style="font-size:11px;color:var(--color-text-secondary, #999);margin-left:auto;">${detail}</span>
-      </div>`;
+      </div>${connectorHtml}`;
     }).join('');
 
     const allDoneHtml = ruleStatus.allFulfilled
@@ -132,7 +137,7 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
       // Check which rules would become fulfilled if user signs
       // We approximate by checking rules that need exactly 1 more member
       const wouldComplete = unfulfilled.filter((r: RuleStatusEntry) => {
-        return !r.requireLeader && r.memberSignoffs.length === r.minMembers - 1;
+        return r.type === 'members' && r.memberSignoffs.length === (r.minMembers ?? 1) - 1;
       });
       if (wouldComplete.length > 0) {
         ruleContext = ` — completes ${wouldComplete.map(r => escapeHtml(r.groupName)).join(', ')} requirement`;

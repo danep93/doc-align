@@ -386,15 +386,15 @@ const realApi = {
   // Sign-off rules
   getOrgDefaultRules: (orgId: string) =>
     request<SignoffRuleset>(`/organizations/${orgId}/signoff-rules`),
-  setOrgDefaultRules: (orgId: string, rules: SignoffRule[]) =>
+  setOrgDefaultRules: (orgId: string, rules: SignoffRule[], connectors: ('AND' | 'OR')[]) =>
     request<SignoffRuleset>(`/organizations/${orgId}/signoff-rules`, {
-      method: 'PUT', body: JSON.stringify({ rules }),
+      method: 'PUT', body: JSON.stringify({ rules, connectors }),
     }),
   getDocRules: (orgId: string, documentId: string) =>
     request<SignoffRuleset>(`/organizations/${orgId}/signoff-rules/documents/${documentId}`),
-  setDocRules: (orgId: string, documentId: string, rules: SignoffRule[]) =>
+  setDocRules: (orgId: string, documentId: string, rules: SignoffRule[], connectors: ('AND' | 'OR')[]) =>
     request<SignoffRuleset>(`/organizations/${orgId}/signoff-rules/documents/${documentId}`, {
-      method: 'PUT', body: JSON.stringify({ rules }),
+      method: 'PUT', body: JSON.stringify({ rules, connectors }),
     }),
   resetDocRules: (orgId: string, documentId: string) =>
     request<void>(`/organizations/${orgId}/signoff-rules/documents/${documentId}`, { method: 'DELETE' }),
@@ -552,17 +552,17 @@ const proxyApi = {
     const a = await getApi();
     return a.getOrgDefaultRules(orgId);
   },
-  setOrgDefaultRules: async (orgId: string, rules: SignoffRule[]) => {
+  setOrgDefaultRules: async (orgId: string, rules: SignoffRule[], connectors: ('AND' | 'OR')[]) => {
     const a = await getApi();
-    return a.setOrgDefaultRules(orgId, rules);
+    return a.setOrgDefaultRules(orgId, rules, connectors);
   },
   getDocRules: async (orgId: string, documentId: string) => {
     const a = await getApi();
     return a.getDocRules(orgId, documentId);
   },
-  setDocRules: async (orgId: string, documentId: string, rules: SignoffRule[]) => {
+  setDocRules: async (orgId: string, documentId: string, rules: SignoffRule[], connectors: ('AND' | 'OR')[]) => {
     const a = await getApi();
-    return a.setDocRules(orgId, documentId, rules);
+    return a.setDocRules(orgId, documentId, rules, connectors);
   },
   resetDocRules: async (orgId: string, documentId: string) => {
     const a = await getApi();

@@ -56,7 +56,7 @@ router.put('/', async (req: AuthenticatedRequest, res) => {
       return;
     }
 
-    const rules = await setOrgDefaultRules(orgId, parsed.data.rules, req.userId!);
+    const rules = await setOrgDefaultRules(orgId, parsed.data.rules, parsed.data.connectors, req.userId!);
     res.json(rules);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error';
@@ -165,7 +165,7 @@ router.put('/documents/:documentId', async (req: AuthenticatedRequest, res) => {
       return;
     }
 
-    const rules = await setDocRules(orgId, documentId, parsed.data.rules, req.userId!);
+    const rules = await setDocRules(orgId, documentId, parsed.data.rules, parsed.data.connectors, req.userId!);
     res.json(rules);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error';
