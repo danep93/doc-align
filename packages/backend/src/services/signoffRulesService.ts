@@ -265,18 +265,15 @@ export async function getRuleStatus(orgId: string, documentId: string): Promise<
       ? signoffs.some((s) => s.userId === leaderId)
       : false;
 
-    let fulfilled: boolean;
-    if (rule.type === 'leader') {
-      fulfilled = leaderSignedOff;
-    } else {
-      fulfilled = uniqueMemberSignoffs.length >= (rule.minMembers ?? 1);
-    }
+    const membersFulfilled = uniqueMemberSignoffs.length >= rule.minMembers;
+    const leaderFulfilled = !rule.requireLeader || leaderSignedOff;
+    const fulfilled = membersFulfilled && leaderFulfilled;
 
     ruleEntries.push({
       groupId: rule.groupId,
       groupName: rule.groupName,
-      type: rule.type,
       minMembers: rule.minMembers,
+      requireLeader: rule.requireLeader,
       memberSignoffs: uniqueMemberSignoffs,
       leaderSignedOff,
       fulfilled,

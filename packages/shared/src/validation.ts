@@ -106,8 +106,8 @@ export const ChangeRoleSchema = z.object({
 export const SignoffRuleSchema = z.object({
   groupId: z.string().min(1),
   groupName: z.string().min(1),
-  type: z.enum(['members', 'leader']),
-  minMembers: z.number().int().min(1).optional(),
+  minMembers: z.number().int().min(0),
+  requireLeader: z.boolean(),
 });
 
 export const UpdateSignoffRulesSchema = z.object({

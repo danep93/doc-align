@@ -134,8 +134,8 @@ export interface GroupResponse {
 export interface SignoffRule {
   groupId: string;
   groupName: string;
-  type: 'members' | 'leader';
-  minMembers?: number;
+  minMembers: number;
+  requireLeader: boolean;
 }
 
 export interface SignoffRuleset {
@@ -161,8 +161,8 @@ export interface OrgDocument {
 export interface RuleStatusEntry {
   groupId: string;
   groupName: string;
-  type: 'members' | 'leader';
-  minMembers?: number;
+  minMembers: number;
+  requireLeader: boolean;
   memberSignoffs: { userId: string; name: string; signedAt: string }[];
   leaderSignedOff: boolean;
   fulfilled: boolean;

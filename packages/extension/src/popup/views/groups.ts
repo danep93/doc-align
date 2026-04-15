@@ -830,10 +830,14 @@ async function renderRulesView(contentArea: HTMLElement, org: Organization): Pro
       const card = document.createElement('div');
       card.className = 'rule-card mb-1';
 
-      const ruleDesc =
-        rule.type === 'leader'
-          ? `${escapeHtml(rule.groupName)} leader must sign`
-          : `${rule.minMembers ?? 1} ${escapeHtml(rule.groupName)} member(s) must sign`;
+      let ruleDesc: string;
+      if (rule.minMembers > 0 && rule.requireLeader) {
+        ruleDesc = `${rule.minMembers} ${escapeHtml(rule.groupName)} member(s) + leader must sign`;
+      } else if (rule.minMembers > 0) {
+        ruleDesc = `${rule.minMembers} ${escapeHtml(rule.groupName)} member(s) must sign`;
+      } else {
+        ruleDesc = `${escapeHtml(rule.groupName)} leader must sign`;
+      }
 
       card.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center">
@@ -933,28 +937,33 @@ async function renderRulesView(contentArea: HTMLElement, org: Organization): Pro
     }
     form.appendChild(groupSelect);
 
-    // Type radios
-    const radioDiv = document.createElement('div');
-    radioDiv.style.cssText = 'display:flex;gap:12px;align-items:center;margin-bottom:6px;font-size:12px';
-    radioDiv.innerHTML = `
+    // Requirement checkboxes
+    const checkDiv = document.createElement('div');
+    checkDiv.style.cssText = 'display:flex;flex-direction:column;gap:6px;margin-bottom:6px;font-size:12px';
+    checkDiv.innerHTML = `
       <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-        <input type="radio" name="rule-type" value="members" checked /> Member(s)
+        <input type="checkbox" class="rule-members-check" checked /> Members:
+        <input type="number" min="1" value="1" style="width:50px" class="form-input rule-member-count" />
       </label>
-      <input type="number" min="1" value="1" style="width:50px" class="form-input rule-member-count" />
       <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-        <input type="radio" name="rule-type" value="leader" /> Leader
+        <input type="checkbox" class="rule-leader-check" /> Require leader
       </label>
+      <div class="rule-validation-msg text-xs text-danger" style="display:none">At least one option must be selected</div>
     `;
-    form.appendChild(radioDiv);
+    form.appendChild(checkDiv);
 
-    const memberCountInput = radioDiv.querySelector('.rule-member-count') as HTMLInputElement;
+    const membersCheck = checkDiv.querySelector('.rule-members-check') as HTMLInputElement;
+    const leaderCheck = checkDiv.querySelector('.rule-leader-check') as HTMLInputElement;
+    const memberCountInput = checkDiv.querySelector('.rule-member-count') as HTMLInputElement;
+    const validationMsg = checkDiv.querySelector('.rule-validation-msg') as HTMLElement;
 
-    // Toggle count input visibility
-    radioDiv.querySelectorAll('input[name="rule-type"]').forEach((radio) => {
-      radio.addEventListener('change', () => {
-        const val = (radio as HTMLInputElement).value;
-        memberCountInput.style.display = val === 'members' ? 'block' : 'none';
-      });
+    // Toggle count input enabled state
+    membersCheck.addEventListener('change', () => {
+      memberCountInput.disabled = !membersCheck.checked;
+      validationMsg.style.display = (!membersCheck.checked && !leaderCheck.checked) ? 'block' : 'none';
+    });
+    leaderCheck.addEventListener('change', () => {
+      validationMsg.style.display = (!membersCheck.checked && !leaderCheck.checked) ? 'block' : 'none';
     });
 
     const actions = document.createElement('div');
@@ -972,16 +981,18 @@ async function renderRulesView(contentArea: HTMLElement, org: Organization): Pro
     contentArea.appendChild(form);
 
     addBtn.addEventListener('click', async () => {
+      if (!membersCheck.checked && !leaderCheck.checked) {
+        validationMsg.style.display = 'block';
+        return;
+      }
+
       const selectedOpt = groupSelect.selectedOptions[0]!;
-      const ruleType = (radioDiv.querySelector('input[name="rule-type"]:checked') as HTMLInputElement).value as
-        | 'members'
-        | 'leader';
 
       const newRule: SignoffRule = {
         groupId: selectedOpt.value,
         groupName: selectedOpt.dataset.groupName || selectedOpt.textContent || '',
-        type: ruleType,
-        ...(ruleType === 'members' ? { minMembers: parseInt(memberCountInput.value, 10) || 1 } : {}),
+        minMembers: membersCheck.checked ? (parseInt(memberCountInput.value, 10) || 1) : 0,
+        requireLeader: leaderCheck.checked,
       };
 
       if (rules.length > 0) {
@@ -1005,10 +1016,12 @@ function buildRuleSummary(rules: SignoffRule[], connectors: ('AND' | 'OR')[]): s
   const parts: string[] = [];
   for (let i = 0; i < rules.length; i++) {
     const r = rules[i]!;
-    if (r.type === 'leader') {
-      parts.push(`${r.groupName} leader`);
+    if (r.minMembers > 0 && r.requireLeader) {
+      parts.push(`${r.minMembers} from ${r.groupName} + leader`);
+    } else if (r.minMembers > 0) {
+      parts.push(`${r.minMembers} from ${r.groupName}`);
     } else {
-      parts.push(`${r.minMembers ?? 1} from ${r.groupName}`);
+      parts.push(`${r.groupName} leader`);
     }
     if (i < rules.length - 1) {
       parts.push(connectors[i] ?? 'AND');
