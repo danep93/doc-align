@@ -939,13 +939,13 @@ async function renderRulesView(contentArea: HTMLElement, org: Organization): Pro
 
     // Requirement checkboxes
     const checkDiv = document.createElement('div');
-    checkDiv.style.cssText = 'display:flex;flex-direction:column;gap:6px;margin-bottom:6px;font-size:12px';
+    checkDiv.style.cssText = 'display:flex;flex-direction:column;margin-bottom:6px;font-size:12px';
     checkDiv.innerHTML = `
-      <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:6px;">
         <input type="checkbox" class="rule-members-check" checked /> Members:
-        <input type="number" min="1" value="1" style="width:50px" class="form-input rule-member-count" />
+        <input type="number" min="1" value="1" style="width:40px;padding:4px;text-align:center;" class="form-input rule-member-count" />
       </label>
-      <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:6px;">
         <input type="checkbox" class="rule-leader-check" /> Require leader
       </label>
       <div class="rule-validation-msg text-xs text-danger" style="display:none">At least one option must be selected</div>

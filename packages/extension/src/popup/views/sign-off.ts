@@ -163,9 +163,6 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
   } else {
     buttonText = 'Re-Sign This Doc';
   }
-  if (ruleContext) {
-    buttonText += ruleContext;
-  }
 
   // Determine track button state
   const trackedCount = trackedDocs.length;
@@ -213,6 +210,7 @@ export async function renderSignOffView(container: HTMLElement): Promise<void> {
     </div>
     <div id="signoff-action-area">
       <button class="btn btn-primary" id="sign-off-btn" style="width:100%;">${buttonText}</button>
+      ${ruleContext ? `<div style="font-size:10px;color:var(--color-text-secondary);text-align:center;margin-top:4px;">${escapeHtml(ruleContext.replace(/^ — /, ''))}</div>` : ''}
       ${trackButtonHtml}
     </div>
   `;
