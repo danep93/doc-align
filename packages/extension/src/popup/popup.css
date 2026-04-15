@@ -1193,7 +1193,8 @@ a:hover {
   margin: 8px 0;
 }
 
-.inline-form input,
+.inline-form input[type="text"],
+.inline-form input[type="email"],
 .inline-form select {
   width: 100%;
   padding: 6px 8px;

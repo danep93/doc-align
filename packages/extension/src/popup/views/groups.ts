@@ -939,16 +939,18 @@ async function renderRulesView(contentArea: HTMLElement, org: Organization): Pro
 
     // Requirement checkboxes
     const checkDiv = document.createElement('div');
-    checkDiv.style.cssText = 'display:flex;flex-direction:column;margin-bottom:6px;font-size:12px';
+    checkDiv.style.cssText = 'margin-bottom:8px;font-size:12px';
     checkDiv.innerHTML = `
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:6px;">
-        <input type="checkbox" class="rule-members-check" checked /> Members:
-        <input type="number" min="1" value="1" style="width:40px;padding:4px;text-align:center;" class="form-input rule-member-count" />
-      </label>
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:6px;">
-        <input type="checkbox" class="rule-leader-check" /> Require leader
-      </label>
-      <div class="rule-validation-msg text-xs text-danger" style="display:none">At least one option must be selected</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <input type="checkbox" class="rule-members-check" checked style="width:16px;height:16px;margin:0;flex-shrink:0;" />
+        <span>Members:</span>
+        <input type="number" min="1" value="1" class="rule-member-count" style="width:44px;padding:4px 6px;text-align:center;background:var(--color-surface-1);border:1px solid var(--color-border);border-radius:var(--radius-sm);color:var(--color-text-primary);font-size:12px;flex-shrink:0;" />
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+        <input type="checkbox" class="rule-leader-check" style="width:16px;height:16px;margin:0;flex-shrink:0;" />
+        <span>Require leader</span>
+      </div>
+      <div class="rule-validation-msg text-xs text-danger" style="display:none;margin-top:4px;">At least one option must be selected</div>
     `;
     form.appendChild(checkDiv);
 
