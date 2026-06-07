@@ -209,13 +209,25 @@ function checkDriftAndSave(state) {
 }
 
 // ============================================================
-// HTML SERVICE ENTRY POINT
+// MENU & SIDEBAR ENTRY POINTS
 // ============================================================
 
-function onHomepage(e) {
-  return HtmlService.createHtmlOutputFromFile('sidebar')
+function onOpen() {
+  DocumentApp.getUi()
+    .createAddonMenu()
+    .addItem('Open Sidebar', 'showSidebar')
+    .addToUi();
+}
+
+function onInstall(e) {
+  onOpen(e);
+}
+
+function showSidebar() {
+  var html = HtmlService.createHtmlOutputFromFile('sidebar')
     .setTitle('doc-align')
     .setWidth(350);
+  DocumentApp.getUi().showSidebar(html);
 }
 
 // ============================================================
