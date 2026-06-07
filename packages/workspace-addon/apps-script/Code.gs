@@ -214,7 +214,7 @@ function checkDriftAndSave(state) {
 
 function onOpen() {
   DocumentApp.getUi()
-    .createAddonMenu()
+    .createMenu('doc-align')
     .addItem('Open Sidebar', 'showSidebar')
     .addToUi();
 }
@@ -222,7 +222,6 @@ function onOpen() {
 function onInstall(e) {
   onOpen(e);
 }
-
 function showSidebar() {
   var html = HtmlService.createHtmlOutputFromFile('sidebar')
     .setTitle('doc-align')
