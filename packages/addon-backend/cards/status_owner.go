@@ -13,7 +13,7 @@ type SignerStatus struct {
 	CommitMessage   string
 }
 
-func StatusOwner(docTitle string, signers []SignerStatus) Response {
+func StatusOwner(docTitle string, signers []SignerStatus, docID string) Card {
 	signed := 0
 	drifted := 0
 	pending := 0
@@ -50,15 +50,18 @@ func StatusOwner(docTitle string, signers []SignerStatus) Response {
 
 	signerWidgets := make([]Widget, 0, len(sorted))
 	for _, s := range sorted {
-		icon := statusIcon(s.Status)
+		icon := statusIconWidget(s.Status)
 		label := s.DisplayName
 		if label == "" {
 			label = s.Email
 		}
-		bottom := fmt.Sprintf("%s · %s", s.Status, relativeTime(s.StatusAt))
+		bottom := s.Status
+		if rt := relativeTime(s.StatusAt); rt != "" {
+			bottom += " · " + rt
+		}
 		w := Widget{
 			DecoratedText: &DecoratedText{
-				StartIcon:   knownIcon(icon),
+				StartIcon:   icon,
 				Text:        label,
 				BottomLabel: bottom,
 				WrapText:    true,
@@ -70,7 +73,8 @@ func StatusOwner(docTitle string, signers []SignerStatus) Response {
 			signerWidgets = append(signerWidgets, Widget{
 				ButtonList: &ButtonList{Buttons: []Button{
 					actionButton("View changes", "/addon/diff",
-						Parameter{Key: "signerEmail", Value: s.Email}),
+						Parameter{Key: "signerEmail", Value: s.Email},
+						Parameter{Key: "docId", Value: docID}),
 				}},
 			})
 		}
@@ -78,7 +82,10 @@ func StatusOwner(docTitle string, signers []SignerStatus) Response {
 
 	footerWidgets := []Widget{
 		{ButtonList: &ButtonList{Buttons: []Button{
-			actionButton("History", "/addon/history"),
+			actionButton("Invite signers", "/addon/save-signers",
+				Parameter{Key: "docId", Value: docID}),
+			actionButton("History", "/addon/history",
+				Parameter{Key: "docId", Value: docID}),
 		}}},
 	}
 
@@ -97,21 +104,23 @@ func StatusOwner(docTitle string, signers []SignerStatus) Response {
 		},
 	}
 
-	return Push(Card{
+	subtitle := fmt.Sprintf("%d of %d signed", signed, len(signers))
+
+	return Card{
 		Name:     "status_owner",
-		Header:   &Header{Title: docTitle, Subtitle: "Owner view"},
+		Header:   &Header{Title: docTitle, Subtitle: subtitle},
 		Sections: sections,
-	})
+	}
 }
 
-func statusIcon(status string) string {
+func statusIconWidget(status string) *Icon {
 	switch status {
 	case "signed":
-		return "CHECK_CIRCLE"
+		return matIcon("check_circle")
 	case "drifted":
-		return "WARNING"
+		return matIcon("warning")
 	default:
-		return "HOURGLASS"
+		return matIcon("pending")
 	}
 }
 

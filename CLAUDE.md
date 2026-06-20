@@ -1,6 +1,6 @@
 # doc-align
 
-Privacy-first Chrome extension for Google Docs sign-off and alignment.
+Privacy-first Chrome extension + Google Workspace Add-on for Google Docs sign-off and alignment.
 
 ## Project Structure
 
@@ -8,147 +8,68 @@ TypeScript monorepo with pnpm workspaces:
 - `packages/shared` — types, validation (Zod), tier logic
 - `packages/backend` — Express API (Firebase Auth, Firestore, Stripe)
 - `packages/extension` — Chrome extension (Manifest V3, webpack)
-- `packages/addon-backend` — **Go HTTP server** for the Workspace Add-on (Card Service, NOT pnpm)
+- `packages/addon-backend` — **Go HTTP server** for the Workspace Add-on (Card Service)
 - `packages/workspace-addon/manifest/appsscript.json` — Add-on manifest (OAuth scopes, trigger config)
-
-## Commands
-
-- `pnpm install` — install all dependencies
-- `pnpm run build-all` — build all packages
-- `pnpm run test-all` — run all tests
-- `pnpm run typecheck` — typecheck all packages
-- `cd packages/extension && pnpm run watch` — dev build with watch
-- `cd packages/backend && pnpm run dev` — dev server with hot reload
-
-## Key Conventions
-
-- All types shared via `@doc-align/shared` workspace package
-- Backend stores NO document content — only signature metadata and doc references
-- Diff computation is always client-side (extension)
-- Firebase Auth for both extension auth and backend API auth
-- Zod schemas validate at API boundaries
-- Tests use vitest
-
-## Verifying Changes
-
-After ANY change to extension UI, backend routes, auth flow, or shared types:
-1. Build all: `pnpm run build-all`
-2. Run E2E tests: `pnpm test:e2e`
-3. Do NOT claim a fix works unless E2E tests pass
-4. If a relevant E2E test doesn't exist for the change, write one first
-
-If E2E tests fail, read the screenshot and trace output to diagnose.
-Do not say "I can't verify because I can't click in the extension."
-The E2E tests ARE the verification.
-
-### Bug fix workflow
-1. Write a failing E2E test that reproduces the bug
-2. Fix the bug
-3. Run `pnpm test:e2e` — new test passes, existing tests don't regress
-4. Only then report the fix as complete
 
 ---
 
-## Workspace Add-on (Go backend)
+## Active Work: Workspace Add-on (Go backend)
 
-The add-on is a native Card Service add-on backed by a Go HTTP server. No React, no Apps Script logic — Google POSTs to HTTPS endpoints and the server returns Card Service JSON.
+The add-on is an HTTP Card Service add-on. Google POSTs JSON events to HTTPS endpoints; the server returns Card Service JSON. No Apps Script, no React.
 
-Design spec: `docs/superpowers/specs/2026-06-14-workspace-addon-card-service-design.md`
-
-### Go backend commands
-
-```bash
-# Build
-cd packages/addon-backend && go build ./...
-
-# Run locally (dev mode — skips OIDC verification)
-cd packages/addon-backend
-OIDC_BYPASS=true DEBUG_EMAIL=rhlrtr44@gmail.com FIREBASE_PROJECT_ID=<project-id> PORT=8080 go run .
-```
-
-`OIDC_BYPASS=true` skips Google OIDC JWT verification and reads the user email from `DEBUG_EMAIL` instead. Required for local ngrok testing since Google won't issue real JWTs to a dev machine.
-
-### Running with ngrok (full local test)
-
-Prerequisites:
-- Go 1.22+ installed (`brew install go`)
-- `gcloud` CLI authenticated: `gcloud auth application-default login`
-- ngrok installed: `brew install ngrok/ngrok/ngrok`
-- A Google Cloud project with Firestore enabled (Native mode)
-
-Steps:
-```bash
-# 1. Authenticate
-gcloud auth application-default login
-export FIREBASE_PROJECT_ID=your-gcp-project-id   # the Firebase/GCP project with Firestore
-
-# 2. Start server
-cd packages/addon-backend
-OIDC_BYPASS=true DEBUG_EMAIL=rhlrtr44@gmail.com FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID go run .
-# → "listening on :8080"
-
-# 3. In a new terminal: start ngrok
-ngrok http 8080
-# → copy the https://xxxx.ngrok-free.app URL
-
-# 4. Register in Google Cloud Console
-#    Go to: console.cloud.google.com → APIs & Services → Workspace Add-on SDK
-#    Click "MANAGE" → "Configuration" → "HTTP Deployments"
-#    Set endpoint URL: https://xxxx.ngrok-free.app
-#    Docs homepage trigger: https://xxxx.ngrok-free.app/addon/homepage
-#    Gmail contextual trigger: https://xxxx.ngrok-free.app/addon/gmail-trigger
-#    OAuth scopes: documents.readonly, drive.file, userinfo.email, gmail.addons.current.message.metadata
-#    Click "Install for testing" and add rhlrtr44@gmail.com
-
-# 5. Open any Google Doc
-#    Extensions menu → doc-align → Open
-#    → hits POST /addon/homepage → returns EmptyState card
-```
-
-### Test walkthrough (all Docs card views)
-
-Walk these in order to exercise the full flow:
-1. Open sidebar in a Google Doc → **Empty State** card → click "Create baseline"
-2. **Add Signers** card → type one or more emails → "Done"
-3. **Status card (owner view)** → shows signers as pending
-4. Open same doc logged in as a signer → **Status card (signer view)** → "Sign this doc"
-5. **Sign Form** card → optionally enter commit message → "Sign"
-6. Back to **Status card** → signer shows as signed with timestamp
-7. Click "History" → **History card** → shows baseline created + sign events
-8. Edit the doc, wait for drift check (or use "Simulate drift" overflow menu item) → "View changes" → **Diff View**
-
-### Diff view prerequisite
-
-The diff view fetches the signed revision text using the owner's OAuth token stored in Firestore. For this to work you need `ownerRefreshToken` in `documents/{docId}`. This is stored automatically when the owner creates a baseline — but requires the owner's refresh token to have been captured via OAuth. For local testing you can manually write a token into Firestore via the console, or ask Claude to wire up the OAuth callback endpoint.
+**Running notes** (what works, what's broken, what's left): `docs/superpowers/specs/2026-06-14-addon-backend-running-notes.md`
+**Design spec**: `docs/superpowers/specs/2026-06-14-workspace-addon-card-service-design.md`
+**Setup & run instructions** (ngrok install, daily run loop, GCP reference): `instructions.md`
 
 ### Key files
 
 ```
 packages/addon-backend/
-  main.go                         — HTTP server, route registration
-  middleware/verify_oidc.go       — OIDC JWT verification (bypass with OIDC_BYPASS=true)
-  cards/types.go                  — Card Service JSON structs
-  cards/*.go                      — Card builders (one per view)
-  routes/*.go                     — Route handlers (one per endpoint)
-  services/firestore.go           — Firestore CRUD for documents/{docId}, signers, history
-  services/doc_text.go            — Docs API: fetch current text + parse sections by heading
-  services/doc_revisions.go       — Drive Revisions API: keepForever, export text
-  services/drift_detection.go     — LCS diff + section similarity scoring
-  services/owner_token.go         — Owner OAuth token store (plaintext MVP; KMS in Phase 2)
-packages/workspace-addon/manifest/appsscript.json — OAuth scopes and trigger config reference
+  main.go                      — server startup, route registration, cards.BaseURL init
+  middleware/verify_oidc.go    — OIDC JWT verification (bypass with OIDC_BYPASS=true)
+  cards/types.go               — Card Service JSON structs, BaseURL, actionButton helper
+  cards/*.go                   — Card builders (one file per view)
+  routes/event.go              — AddonEvent decode, writeErr/writeActionErr, resolveDocID
+  routes/*.go                  — Route handlers (one file per endpoint)
+  services/firestore.go        — Firestore CRUD
+  services/recent_doc.go       — Drive API fallback for doc ID (MostRecentDocID)
+  services/doc_text.go         — Docs API: fetch current text
+  services/doc_revisions.go    — Drive Revisions API
+  services/drift_detection.go  — LCS diff + section scoring
+  services/owner_token.go      — Owner OAuth token store
 ```
 
-### Firestore data model
+### Critical invariants (learned the hard way)
 
+- **Homepage triggers return bare `Card`; action callbacks return `RenderActions`.**  
+  Use `writeErr` for homepage handlers, `writeActionErr` for all action handlers. Wrong type = silent failure.
+
+- **`FormAction.function` must be a full HTTPS URL.**  
+  `cards.BaseURL` is prepended by `actionButton()`. Never pass a relative path.
+
+- **`docs.id` is empty in homepage triggers.**  
+  `routes/homepage.go` falls back to `services.MostRecentDocID()` (Drive API, ~1-2s overhead).  
+  All card builders accept `docID string` and embed it as a button parameter so subsequent action handlers get it via `ev.resolveDocID()`.
+
+- **Use `materialIcon`, not `knownIcon`.**  
+  KnownIcon enum is very limited. `HOURGLASS`, `CHECK_CIRCLE`, `WARNING` are invalid and render broken images.
+
+---
+
+## Inactive / Deprecated
+
+The following packages exist but are not the current focus:
+
+- `packages/extension` — Chrome extension. Build with `cd packages/extension && pnpm run watch`.
+- `packages/backend` — Express API. Run with `cd packages/backend && pnpm run dev`.
+- `packages/shared` — shared types, used by extension and backend.
+
+E2E test workflow (`pnpm test:e2e`) applies to the extension/backend packages, not the Go add-on backend.
+
+Monorepo commands (when working on extension or backend):
+```bash
+pnpm install          # install dependencies
+pnpm run build-all    # build all TS packages
+pnpm run test-all     # run all TS tests
+pnpm run typecheck    # typecheck all TS packages
 ```
-documents/{docId}
-  title, ownerId, ownerRefreshToken, baselineRevisionId, lastDriftCheckedAt, createdAt
-
-documents/{docId}/signers/{email}
-  status (pending|signed|drifted), signedAt, signedRevisionId, commitMessage
-
-documents/{docId}/history/{id}
-  action, actorEmail, commitMessage, revisionId, timestamp
-```
-
-No document content is ever written to Firestore. Only revision IDs and metadata.

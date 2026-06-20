@@ -1,6 +1,9 @@
 package cards
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type HistoryEntry struct {
 	Action        string // baseline_created | signed | drifted | review_requested
@@ -10,14 +13,21 @@ type HistoryEntry struct {
 	Timestamp     time.Time
 }
 
-func HistoryView(entries []HistoryEntry) Response {
+func emailLocalPart(email string) string {
+	if i := strings.Index(email, "@"); i > 0 {
+		return email[:i]
+	}
+	return email
+}
+
+func HistoryView(entries []HistoryEntry) Card {
 	widgets := make([]Widget, 0, len(entries))
 
 	for _, e := range entries {
-		icon := historyIcon(e.Action)
+		icon := historyIconWidget(e.Action)
 		actor := e.ActorName
 		if actor == "" {
-			actor = e.ActorEmail
+			actor = emailLocalPart(e.ActorEmail)
 		}
 		top := actor + " " + humanAction(e.Action)
 		bottom := relativeTime(e.Timestamp)
@@ -26,7 +36,7 @@ func HistoryView(entries []HistoryEntry) Response {
 		}
 		widgets = append(widgets, Widget{
 			DecoratedText: &DecoratedText{
-				StartIcon:   knownIcon(icon),
+				StartIcon:   icon,
 				Text:        top,
 				BottomLabel: bottom,
 				WrapText:    true,
@@ -34,33 +44,27 @@ func HistoryView(entries []HistoryEntry) Response {
 		})
 	}
 
-	widgets = append(widgets, Widget{
-		ButtonList: &ButtonList{Buttons: []Button{
-			actionButton("Back", "/addon/homepage"),
-		}},
-	})
-
-	return Push(Card{
+	return Card{
 		Name:   "history",
 		Header: &Header{Title: "History"},
 		Sections: []Section{
 			{Widgets: widgets},
 		},
-	})
+	}
 }
 
-func historyIcon(action string) string {
+func historyIconWidget(action string) *Icon {
 	switch action {
 	case "baseline_created":
-		return "STAR"
+		return matIcon("flag")
 	case "signed":
-		return "CHECK_CIRCLE"
+		return matIcon("check_circle")
 	case "drifted":
-		return "WARNING"
+		return matIcon("warning")
 	case "review_requested":
-		return "PERSON"
+		return matIcon("person")
 	default:
-		return "DESCRIPTION"
+		return matIcon("description")
 	}
 }
 
