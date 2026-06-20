@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>doc-align — Design Approach A: Material Cards</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Google Sans', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #f0f0f0;
+    padding: 32px;
+    color: #1f1f1f;
+  }
+  h1 { font-size: 22px; font-weight: 500; margin-bottom: 6px; color: #1f1f1f; }
+  .page-subtitle { font-size: 14px; color: #5f6368; margin-bottom: 32px; }
+  .approaches { display: flex; gap: 32px; flex-wrap: wrap; align-items: flex-start; }
+  .approach-label { font-size: 13px; font-weight: 500; color: #1a73e8; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .screen-label { font-size: 11px; font-weight: 500; color: #5f6368; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .sidebar {
+    width: 300px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08);
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+
+  /* Card Header */
+  .card-header {
+    padding: 16px 16px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid #e8eaed;
+  }
+  .card-header-icon {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .card-header-icon.purple { background: #e8def8; color: #6750a4; }
+  .card-header-icon.green { background: #d4edda; color: #1e8e3e; }
+  .card-header-icon.blue { background: #d2e3fc; color: #1a73e8; }
+  .card-header-icon.amber { background: #fef7e0; color: #e37400; }
+  .card-header-text h2 { font-size: 16px; font-weight: 500; line-height: 1.3; }
+  .card-header-text p { font-size: 12px; color: #5f6368; margin-top: 1px; }
+
+  /* Sections */
+  .section { padding: 12px 16px; border-bottom: 1px solid #f1f3f4; }
+  .section:last-child { border-bottom: none; }
+  .section-header { font-size: 11px; font-weight: 500; color: #5f6368; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+
+  /* Progress bar */
+  .progress-container { margin-bottom: 4px; }
+  .progress-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .progress-label span:first-child { font-size: 13px; font-weight: 500; color: #1f1f1f; }
+  .progress-label span:last-child { font-size: 12px; color: #5f6368; }
+  .progress-bar { height: 6px; background: #e8eaed; border-radius: 3px; overflow: hidden; display: flex; }
+  .progress-fill-green { background: #1e8e3e; height: 100%; }
+  .progress-fill-amber { background: #e37400; height: 100%; }
+  .progress-fill-grey { background: #dadce0; height: 100%; }
+
+  /* Status chips */
+  .status-chips { display: flex; gap: 6px; margin-top: 10px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px; border-radius: 12px;
+    font-size: 11px; font-weight: 500;
+  }
+  .chip-signed { background: #e6f4ea; color: #1e8e3e; }
+  .chip-drifted { background: #fef7e0; color: #e37400; }
+  .chip-pending { background: #f1f3f4; color: #5f6368; }
+  .chip-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .chip-signed .chip-dot { background: #1e8e3e; }
+  .chip-drifted .chip-dot { background: #e37400; }
+  .chip-pending .chip-dot { background: #9aa0a6; }
+
+  /* Signer row */
+  .signer-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid #f1f3f4;
+  }
+  .signer-row:last-child { border-bottom: none; }
+  .signer-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 500; flex-shrink: 0;
+    color: #fff;
+  }
+  .avatar-purple { background: #7c4dff; }
+  .avatar-blue { background: #448aff; }
+  .avatar-teal { background: #1de9b6; color: #1f1f1f; }
+  .avatar-pink { background: #ff4081; }
+  .signer-info { flex: 1; min-width: 0; }
+  .signer-name { font-size: 13px; font-weight: 500; color: #1f1f1f; display: flex; align-items: center; gap: 6px; }
+  .signer-role { font-size: 11px; color: #5f6368; margin-top: 1px; }
+  .signer-status { font-size: 11px; margin-top: 2px; display: flex; align-items: center; gap: 4px; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .status-dot.signed { background: #1e8e3e; }
+  .status-dot.drifted { background: #e37400; }
+  .status-dot.pending { background: #9aa0a6; }
+  .signer-action { flex-shrink: 0; }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 6px 16px; border-radius: 16px;
+    font-size: 12px; font-weight: 500;
+    border: none; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-filled { background: #6750a4; color: #fff; }
+  .btn-filled:hover { background: #5a4590; }
+  .btn-outlined { background: transparent; color: #6750a4; border: 1px solid #e0e0e0; }
+  .btn-outlined:hover { background: #f5f0ff; }
+  .btn-text { background: transparent; color: #6750a4; padding: 6px 8px; }
+  .btn-text:hover { background: #f5f0ff; border-radius: 8px; }
+  .btn-small { padding: 4px 10px; font-size: 11px; border-radius: 12px; }
+  .btn-drifted { background: #fff3e0; color: #e37400; border: 1px solid #ffe0b2; }
+
+  /* Fixed footer */
+  .fixed-footer {
+    padding: 12px 16px;
+    border-top: 1px solid #e8eaed;
+    display: flex; gap: 8px;
+    background: #fff;
+  }
+  .fixed-footer .btn { flex: 1; }
+
+  /* Empty state */
+  .empty-state {
+    padding: 32px 24px;
+    text-align: center;
+  }
+  .empty-icon {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: #e8def8;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px;
+    font-size: 28px; color: #6750a4;
+  }
+  .empty-state h3 { font-size: 16px; font-weight: 500; margin-bottom: 6px; }
+  .empty-state p { font-size: 13px; color: #5f6368; line-height: 1.5; margin-bottom: 20px; }
+
+  /* Diff summary */
+  .diff-summary {
+    display: flex; gap: 8px; margin-bottom: 12px;
+  }
+  .diff-stat {
+    flex: 1; padding: 10px; border-radius: 8px; text-align: center;
+  }
+  .diff-stat.added { background: #e6f4ea; }
+  .diff-stat.removed { background: #fce8e6; }
+  .diff-stat.changed { background: #fef7e0; }
+  .diff-stat-number { font-size: 20px; font-weight: 500; }
+  .diff-stat.added .diff-stat-number { color: #1e8e3e; }
+  .diff-stat.removed .diff-stat-number { color: #d93025; }
+  .diff-stat.changed .diff-stat-number { color: #e37400; }
+  .diff-stat-label { font-size: 10px; color: #5f6368; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.3px; }
+
+  /* Diff section card */
+  .diff-section-card {
+    background: #f8f9fa; border-radius: 8px; padding: 10px 12px;
+    margin-bottom: 8px; border-left: 3px solid #e8eaed;
+  }
+  .diff-section-card.modified { border-left-color: #e37400; }
+  .diff-section-card.added { border-left-color: #1e8e3e; }
+  .diff-section-card.removed { border-left-color: #d93025; }
+  .diff-section-title { font-size: 12px; font-weight: 500; margin-bottom: 3px; }
+  .diff-section-desc { font-size: 11px; color: #5f6368; }
+
+  /* History entry */
+  .history-entry {
+    display: flex; gap: 10px; padding: 10px 0;
+    border-bottom: 1px solid #f1f3f4;
+  }
+  .history-entry:last-child { border-bottom: none; }
+  .history-icon {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0;
+  }
+  .history-icon.created { background: #d2e3fc; color: #1a73e8; }
+  .history-icon.signed { background: #e6f4ea; color: #1e8e3e; }
+  .history-icon.drifted { background: #fef7e0; color: #e37400; }
+  .history-info { flex: 1; }
+  .history-action { font-size: 13px; font-weight: 500; }
+  .history-meta { font-size: 11px; color: #5f6368; margin-top: 2px; }
+  .history-msg { font-size: 12px; color: #3c4043; margin-top: 3px; font-style: italic; }
+
+  /* Sign form */
+  .signing-as {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; background: #f8f9fa; border-radius: 8px;
+  }
+  .signing-as .signer-avatar { width: 32px; height: 32px; font-size: 12px; }
+  .signing-as-info { font-size: 12px; }
+  .signing-as-name { font-weight: 500; }
+  .signing-as-role { color: #5f6368; font-size: 11px; }
+
+  .text-input {
+    width: 100%; padding: 8px 12px; border: 1px solid #dadce0;
+    border-radius: 8px; font-size: 13px; font-family: inherit;
+    resize: vertical; min-height: 60px;
+    outline: none;
+  }
+  .text-input:focus { border-color: #6750a4; box-shadow: 0 0 0 1px #6750a4; }
+  .input-label { font-size: 12px; font-weight: 500; color: #5f6368; margin-bottom: 6px; }
+
+  .quick-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .quick-chip {
+    padding: 5px 12px; border-radius: 16px;
+    font-size: 11px; font-weight: 500;
+    background: #f1f3f4; color: #3c4043;
+    border: 1px solid #dadce0; cursor: pointer;
+  }
+  .quick-chip:hover { background: #e8eaed; }
+
+  /* Add signers */
+  .signer-checkbox {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f1f3f4;
+  }
+  .signer-checkbox:last-child { border-bottom: none; }
+  .checkbox { width: 18px; height: 18px; border-radius: 4px; border: 2px solid #5f6368; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .checkbox.checked { background: #6750a4; border-color: #6750a4; color: #fff; font-size: 12px; }
+  .checkbox-label { font-size: 13px; flex: 1; }
+  .checkbox-sublabel { font-size: 11px; color: #5f6368; }
+  .you-badge { font-size: 10px; background: #e8def8; color: #6750a4; padding: 1px 6px; border-radius: 8px; font-weight: 500; }
+
+  .columns { display: flex; gap: 24px; flex-wrap: wrap; }
+  .column { }
+  .badge-you { font-size: 10px; background: #e8def8; color: #6750a4; padding: 1px 6px; border-radius: 8px; font-weight: 500; }
+
+  .commit-msg { font-size: 11px; color: #5f6368; font-style: italic; }
+
+  .screen-group { margin-bottom: 40px; }
+  .screen-group-title { font-size: 16px; font-weight: 500; margin-bottom: 16px; color: #1f1f1f; border-bottom: 2px solid #6750a4; padding-bottom: 6px; display: inline-block; }
+</style>
+</head>
+<body>
+
+<h1>Approach A: Material Cards</h1>
+<p class="page-subtitle">Rich, visually engaging -- uses Material 3 color roles, avatar circles, progress indicators, and section-level diff summaries. All within Card Service constraints.</p>
+
+<div class="columns">
+<div class="column">
+
+<!-- EMPTY STATE -->
+<div class="screen-label">Empty State</div>
+<div class="sidebar">
+  <div class="empty-state">
+    <div class="empty-icon">&#x1F4DD;</div>
+    <h3>Track sign-offs</h3>
+    <p>Lock in approvals with commit messages.<br>See what changed since sign-off.</p>
+    <button class="btn btn-filled">Create baseline</button>
+  </div>
+</div>
+
+<!-- STATUS CARD -->
+<div class="screen-label">Status Card (main screen)</div>
+<div class="sidebar">
+  <div class="card-header">
+    <div class="card-header-icon purple">&#x1F4C4;</div>
+    <div class="card-header-text">
+      <h2>Q3 Product Spec</h2>
+      <p>3 signers</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="progress-container">
+      <div class="progress-label">
+        <span>Sign-off progress</span>
+        <span>1 of 3</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill-green" style="width: 33%"></div>
+        <div class="progress-fill-amber" style="width: 33%"></div>
+        <div class="progress-fill-grey" style="width: 34%"></div>
+      </div>
+      <div class="status-chips">
+        <span class="chip chip-signed"><span class="chip-dot"></span>1 signed</span>
+        <span class="chip chip-drifted"><span class="chip-dot"></span>1 drifted</span>
+        <span class="chip chip-pending"><span class="chip-dot"></span>1 pending</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <!-- Drifted signer -->
+    <div class="signer-row">
+      <div class="signer-avatar avatar-purple">AM</div>
+      <div class="signer-info">
+        <div class="signer-name">Alice M. <span class="chip chip-drifted" style="font-size:10px;padding:1px 6px;">Drifted</span></div>
+        <div class="signer-role">Product Manager</div>
+        <div class="signer-status" style="color: #e37400;">
+          <span class="status-dot drifted"></span>
+          Doc changed since sign-off
+        </div>
+      </div>
+      <div class="signer-action">
+        <button class="btn btn-small btn-drifted">View changes</button>
+      </div>
+    </div>
+
+    <!-- Signed signer -->
+    <div class="signer-row">
+      <div class="signer-avatar avatar-teal">RK</div>
+      <div class="signer-info">
+        <div class="signer-name">Rahul K. <span class="chip chip-signed" style="font-size:10px;padding:1px 6px;">Signed</span></div>
+        <div class="signer-role">Senior Engineer</div>
+        <div class="signer-status" style="color: #5f6368;">
+          <span class="status-dot signed"></span>
+          <span class="commit-msg">"Approved architecture for v2"</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pending signer -->
+    <div class="signer-row">
+      <div class="signer-avatar avatar-blue">JD</div>
+      <div class="signer-info">
+        <div class="signer-name">John D.</div>
+        <div class="signer-role">Engineering Lead</div>
+        <div class="signer-status" style="color: #9aa0a6;">
+          <span class="status-dot pending"></span>
+          Awaiting sign-off
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fixed-footer">
+    <button class="btn btn-filled">Sign this doc</button>
+    <button class="btn btn-outlined">History</button>
+  </div>
+</div>
+
+</div>
+<div class="column">
+
+<!-- DIFF VIEW -->
+<div class="screen-label">Diff View (visual summary)</div>
+<div class="sidebar">
+  <div class="card-header">
+    <div class="card-header-icon amber">&#x26A0;</div>
+    <div class="card-header-text">
+      <h2>Changes since Alice's sign-off</h2>
+      <p>Q3 Product Spec</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="diff-summary">
+      <div class="diff-stat added">
+        <div class="diff-stat-number">3</div>
+        <div class="diff-stat-label">Added</div>
+      </div>
+      <div class="diff-stat removed">
+        <div class="diff-stat-number">1</div>
+        <div class="diff-stat-label">Removed</div>
+      </div>
+      <div class="diff-stat changed">
+        <div class="diff-stat-number">2</div>
+        <div class="diff-stat-label">Modified</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">Changed sections</div>
+    <div class="diff-section-card modified">
+      <div class="diff-section-title">Scope &amp; Requirements</div>
+      <div class="diff-section-desc">2 paragraphs modified, 1 paragraph added</div>
+    </div>
+    <div class="diff-section-card added">
+      <div class="diff-section-title">Budget Estimation</div>
+      <div class="diff-section-desc">New section added (3 paragraphs)</div>
+    </div>
+    <div class="diff-section-card removed">
+      <div class="diff-section-title">Legacy Timeline</div>
+      <div class="diff-section-desc">Section removed entirely</div>
+    </div>
+    <div class="diff-section-card modified">
+      <div class="diff-section-title">Team Assignments</div>
+      <div class="diff-section-desc">1 role changed</div>
+    </div>
+  </div>
+
+  <div class="fixed-footer">
+    <button class="btn btn-filled" style="flex:1">Back to status</button>
+  </div>
+</div>
+
+<!-- SIGN FORM -->
+<div class="screen-label">Sign Form</div>
+<div class="sidebar">
+  <div class="card-header">
+    <div class="card-header-icon green">&#x2713;</div>
+    <div class="card-header-text">
+      <h2>Sign this doc</h2>
+      <p>Q3 Product Spec</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="signing-as">
+      <div class="signer-avatar avatar-teal" style="width:32px;height:32px;font-size:12px;">RK</div>
+      <div class="signing-as-info">
+        <div class="signing-as-name">Rahul K.</div>
+        <div class="signing-as-role">Senior Engineer</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="input-label">Commit message</div>
+    <textarea class="text-input" placeholder="What are you approving?"></textarea>
+  </div>
+
+  <div class="section">
+    <div class="section-header">Quick messages</div>
+    <div class="quick-chips">
+      <span class="quick-chip">LGTM</span>
+      <span class="quick-chip">Approved</span>
+      <span class="quick-chip">Looks good</span>
+      <span class="quick-chip">Signed off</span>
+    </div>
+  </div>
+
+  <div class="fixed-footer">
+    <button class="btn btn-filled">Sign</button>
+    <button class="btn btn-outlined">Cancel</button>
+  </div>
+</div>
+
+<!-- HISTORY -->
+<div class="screen-label">History</div>
+<div class="sidebar">
+  <div class="card-header">
+    <div class="card-header-icon blue">&#x1F4CB;</div>
+    <div class="card-header-text">
+      <h2>History</h2>
+      <p>Q3 Product Spec</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">Today</div>
+    <div class="history-entry">
+      <div class="history-icon signed">&#x2713;</div>
+      <div class="history-info">
+        <div class="history-action">Rahul K. signed</div>
+        <div class="history-meta">Rev r4 &middot; 2h ago</div>
+        <div class="history-msg">"Approved architecture for v2"</div>
+      </div>
+    </div>
+    <div class="history-entry">
+      <div class="history-icon drifted">&#x26A0;</div>
+      <div class="history-info">
+        <div class="history-action">Alice M. drifted</div>
+        <div class="history-meta">Document edited &middot; 1h ago</div>
+      </div>
+    </div>
+    <div class="history-entry">
+      <div class="history-icon created">&#x1F4C4;</div>
+      <div class="history-info">
+        <div class="history-action">Baseline created</div>
+        <div class="history-meta">Rev r1 &middot; 5h ago</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fixed-footer">
+    <button class="btn btn-filled" style="flex:1">Back to status</button>
+  </div>
+</div>
+
+</div>
+</div>
+
+</body>
+</html>

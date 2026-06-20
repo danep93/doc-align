@@ -1,0 +1,174 @@
+package cards
+
+// BaseURL is the public HTTPS base URL of this server (e.g. ngrok URL).
+// Must be set at startup. Action button functions are relative paths that get prefixed with this.
+var BaseURL string
+
+// RenderActions is the top-level response for action callbacks (button clicks).
+// Homepage triggers return a Card directly instead.
+type RenderActions struct {
+	Action ActionNav `json:"action"`
+}
+
+type ActionNav struct {
+	Navigations []Navigation `json:"navigations"`
+}
+
+type Navigation struct {
+	PushCard   *Card `json:"pushCard,omitempty"`
+	UpdateCard *Card `json:"updateCard,omitempty"`
+}
+
+// Card is the root card object.
+type Card struct {
+	Name     string    `json:"name"`
+	Header   *Header   `json:"header,omitempty"`
+	Sections []Section `json:"sections"`
+}
+
+type Header struct {
+	Title    string `json:"title"`
+	Subtitle string `json:"subtitle,omitempty"`
+	ImageUrl string `json:"imageUrl,omitempty"`
+}
+
+type Section struct {
+	Header                    string   `json:"header,omitempty"`
+	HasSeparator              bool     `json:"hasSeparator,omitempty"`
+	Widgets                   []Widget `json:"widgets"`
+	CollapsibleWidgetsCount   int      `json:"collapsibleWidgetsCount,omitempty"`
+	CollapsibleWidgetsExpanded bool    `json:"collapsibleWidgetsExpanded,omitempty"`
+}
+
+type Widget struct {
+	TextParagraph   *TextParagraph   `json:"textParagraph,omitempty"`
+	DecoratedText   *DecoratedText   `json:"decoratedText,omitempty"`
+	ButtonList      *ButtonList      `json:"buttonList,omitempty"`
+	TextInput       *TextInput       `json:"textInput,omitempty"`
+	SelectionInput  *SelectionInput  `json:"selectionInput,omitempty"`
+}
+
+type TextParagraph struct {
+	Text string `json:"text"`
+}
+
+type DecoratedText struct {
+	TopLabel         string   `json:"topLabel,omitempty"`
+	Text             string   `json:"text"`
+	BottomLabel      string   `json:"bottomLabel,omitempty"`
+	StartIcon        *Icon    `json:"startIcon,omitempty"`
+	Button           *Button  `json:"button,omitempty"`
+	WrapText         bool     `json:"wrapText,omitempty"`
+}
+
+type Icon struct {
+	KnownIcon    string        `json:"knownIcon,omitempty"`
+	IconUrl      string        `json:"iconUrl,omitempty"`
+	MaterialIcon *MaterialIcon `json:"materialIcon,omitempty"`
+	AltText      string        `json:"altText,omitempty"`
+}
+
+type MaterialIcon struct {
+	Name string `json:"name"`
+}
+
+type ButtonList struct {
+	Buttons []Button `json:"buttons"`
+}
+
+type Button struct {
+	Text     string  `json:"text"`
+	OnClick  OnClick `json:"onClick"`
+	Disabled bool    `json:"disabled,omitempty"`
+	Color    *Color  `json:"color,omitempty"`
+}
+
+type Color struct {
+	Red   float64 `json:"red"`
+	Green float64 `json:"green"`
+	Blue  float64 `json:"blue"`
+	Alpha float64 `json:"alpha"`
+}
+
+type OnClick struct {
+	Action   *FormAction  `json:"action,omitempty"`
+	OpenLink *OpenLink    `json:"openLink,omitempty"`
+}
+
+type FormAction struct {
+	Function    string      `json:"function"`
+	Parameters  []Parameter `json:"parameters,omitempty"`
+	Interaction string      `json:"interaction,omitempty"` // e.g. "REQUEST_FILE_SCOPE"
+}
+
+type Parameter struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+type OpenLink struct {
+	Url string `json:"url"`
+}
+
+type TextInput struct {
+	Name        string `json:"name"`
+	Label       string `json:"label"`
+	HintText    string `json:"hintText,omitempty"`
+	Value       string `json:"value,omitempty"`
+	Multiline   bool   `json:"multiline,omitempty"`
+}
+
+type SelectionInput struct {
+	Name          string          `json:"name"`
+	Label         string          `json:"label"`
+	Type          string          `json:"type"` // MULTI_SELECT, CHECK_BOX, RADIO_BUTTON, SWITCH
+	Items         []SelectionItem `json:"items"`
+	OnChangeAction *FormAction    `json:"onChangeAction,omitempty"`
+}
+
+type SelectionItem struct {
+	Text     string `json:"text"`
+	Value    string `json:"value"`
+	Selected bool   `json:"selected,omitempty"`
+}
+
+// Push returns a RenderActions that pushes card onto the navigation stack.
+func Push(card Card) RenderActions {
+	return RenderActions{Action: ActionNav{Navigations: []Navigation{{PushCard: &card}}}}
+}
+
+// Update returns a RenderActions that replaces the current card in the stack.
+func Update(card Card) RenderActions {
+	return RenderActions{Action: ActionNav{Navigations: []Navigation{{UpdateCard: &card}}}}
+}
+
+func actionButton(text, function string, params ...Parameter) Button {
+	fn := function
+	if len(fn) > 0 && fn[0] == '/' {
+		fn = BaseURL + fn
+	}
+	return Button{
+		Text: text,
+		OnClick: OnClick{
+			Action: &FormAction{
+				Function:   fn,
+				Parameters: params,
+			},
+		},
+	}
+}
+
+func linkButton(text, url string) Button {
+	return Button{
+		Text:    text,
+		OnClick: OnClick{OpenLink: &OpenLink{Url: url}},
+	}
+}
+
+func knownIcon(name string) *Icon {
+	return &Icon{KnownIcon: name}
+}
+
+func matIcon(name string) *Icon {
+	return &Icon{MaterialIcon: &MaterialIcon{Name: name}}
+}

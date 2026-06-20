@@ -1,6 +1,6 @@
 # doc-align
 
-Privacy-first Chrome extension for Google Docs sign-off and alignment.
+Privacy-first Chrome extension + Google Workspace Add-on for Google Docs sign-off and alignment.
 
 ## Project Structure
 
@@ -8,39 +8,68 @@ TypeScript monorepo with pnpm workspaces:
 - `packages/shared` — types, validation (Zod), tier logic
 - `packages/backend` — Express API (Firebase Auth, Firestore, Stripe)
 - `packages/extension` — Chrome extension (Manifest V3, webpack)
+- `packages/addon-backend` — **Go HTTP server** for the Workspace Add-on (Card Service)
+- `packages/workspace-addon/manifest/appsscript.json` — Add-on manifest (OAuth scopes, trigger config)
 
-## Commands
+---
 
-- `pnpm install` — install all dependencies
-- `pnpm run build-all` — build all packages
-- `pnpm run test-all` — run all tests
-- `pnpm run typecheck` — typecheck all packages
-- `cd packages/extension && pnpm run watch` — dev build with watch
-- `cd packages/backend && pnpm run dev` — dev server with hot reload
+## Active Work: Workspace Add-on (Go backend)
 
-## Key Conventions
+The add-on is an HTTP Card Service add-on. Google POSTs JSON events to HTTPS endpoints; the server returns Card Service JSON. No Apps Script, no React.
 
-- All types shared via `@doc-align/shared` workspace package
-- Backend stores NO document content — only signature metadata and doc references
-- Diff computation is always client-side (extension)
-- Firebase Auth for both extension auth and backend API auth
-- Zod schemas validate at API boundaries
-- Tests use vitest
+**Running notes** (what works, what's broken, what's left): `docs/superpowers/specs/2026-06-14-addon-backend-running-notes.md`
+**Design spec**: `docs/superpowers/specs/2026-06-14-workspace-addon-card-service-design.md`
+**Setup & run instructions** (ngrok install, daily run loop, GCP reference): `instructions.md`
 
-## Verifying Changes
+### Key files
 
-After ANY change to extension UI, backend routes, auth flow, or shared types:
-1. Build all: `pnpm run build-all`
-2. Run E2E tests: `pnpm test:e2e`
-3. Do NOT claim a fix works unless E2E tests pass
-4. If a relevant E2E test doesn't exist for the change, write one first
+```
+packages/addon-backend/
+  main.go                      — server startup, route registration, cards.BaseURL init
+  middleware/verify_oidc.go    — OIDC JWT verification (bypass with OIDC_BYPASS=true)
+  cards/types.go               — Card Service JSON structs, BaseURL, actionButton helper
+  cards/*.go                   — Card builders (one file per view)
+  routes/event.go              — AddonEvent decode, writeErr/writeActionErr, resolveDocID
+  routes/*.go                  — Route handlers (one file per endpoint)
+  services/firestore.go        — Firestore CRUD
+  services/recent_doc.go       — Drive API fallback for doc ID (MostRecentDocID)
+  services/doc_text.go         — Docs API: fetch current text
+  services/doc_revisions.go    — Drive Revisions API
+  services/drift_detection.go  — LCS diff + section scoring
+  services/owner_token.go      — Owner OAuth token store
+```
 
-If E2E tests fail, read the screenshot and trace output to diagnose.
-Do not say "I can't verify because I can't click in the extension."
-The E2E tests ARE the verification.
+### Critical invariants (learned the hard way)
 
-### Bug fix workflow
-1. Write a failing E2E test that reproduces the bug
-2. Fix the bug
-3. Run `pnpm test:e2e` — new test passes, existing tests don't regress
-4. Only then report the fix as complete
+- **Homepage triggers return bare `Card`; action callbacks return `RenderActions`.**  
+  Use `writeErr` for homepage handlers, `writeActionErr` for all action handlers. Wrong type = silent failure.
+
+- **`FormAction.function` must be a full HTTPS URL.**  
+  `cards.BaseURL` is prepended by `actionButton()`. Never pass a relative path.
+
+- **`docs.id` is empty in homepage triggers.**  
+  `routes/homepage.go` falls back to `services.MostRecentDocID()` (Drive API, ~1-2s overhead).  
+  All card builders accept `docID string` and embed it as a button parameter so subsequent action handlers get it via `ev.resolveDocID()`.
+
+- **Use `materialIcon`, not `knownIcon`.**  
+  KnownIcon enum is very limited. `HOURGLASS`, `CHECK_CIRCLE`, `WARNING` are invalid and render broken images.
+
+---
+
+## Inactive / Deprecated
+
+The following packages exist but are not the current focus:
+
+- `packages/extension` — Chrome extension. Build with `cd packages/extension && pnpm run watch`.
+- `packages/backend` — Express API. Run with `cd packages/backend && pnpm run dev`.
+- `packages/shared` — shared types, used by extension and backend.
+
+E2E test workflow (`pnpm test:e2e`) applies to the extension/backend packages, not the Go add-on backend.
+
+Monorepo commands (when working on extension or backend):
+```bash
+pnpm install          # install dependencies
+pnpm run build-all    # build all TS packages
+pnpm run test-all     # run all TS tests
+pnpm run typecheck    # typecheck all TS packages
+```

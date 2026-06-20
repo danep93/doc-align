@@ -1,0 +1,36 @@
+{
+  "timeZone": "America/Los_Angeles",
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "addOns": {
+    "common": {
+      "name": "doc-align",
+      "logoUrl": "https://www.gstatic.com/images/branding/product/1x/googleg_48dp.png",
+      "homepageTrigger": {
+        "runFunction": "onHomepage",
+        "enabled": true
+      },
+      "universalActions": []
+    },
+    "docs": {
+      "homepageTrigger": {
+        "runFunction": "onDocsHomepage",
+        "enabled": true
+      }
+    },
+    "gmail": {
+      "contextualTriggers": [
+        {
+          "unconditional": {},
+          "onTriggerFunction": "onGmailContextualTrigger"
+        }
+      ]
+    }
+  },
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/documents.readonly",
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/gmail.addons.current.message.metadata"
+  ]
+}
