@@ -17,25 +17,30 @@ func CreateBaseline(store *services.Store) http.HandlerFunc {
 
 		ev, err := decodeEvent(r)
 		if err != nil {
-			writeErr(w, "Something went wrong. Please try again.")
+			writeActionErr(w, "Something went wrong. Please try again.")
 			return
 		}
 
-		docID := ev.Docs.ID
+		docID := ev.resolveDocID()
 		docTitle := ev.Docs.Title
 		userToken := ev.AuthorizationEventObject.UserOAuthToken
+
+		if docID == "" {
+			writeActionErr(w, "Could not determine document ID. Please reopen the add-on.")
+			return
+		}
 
 		// Get or create the doc record.
 		doc, err := store.GetDoc(ctx, docID)
 		if err != nil && !isNotFound(err) {
 			log.Printf("create-baseline: GetDoc: %v", err)
-			writeErr(w, "Something went wrong. Please try again.")
+			writeActionErr(w, "Something went wrong. Please try again.")
 			return
 		}
 
 		// Only the owner (first to create baseline) can create it.
 		if doc != nil && doc.OwnerID != userEmail {
-			writeErr(w, "Only the document owner can create a baseline.")
+			writeActionErr(w, "Only the document owner can create a baseline.")
 			return
 		}
 
@@ -60,7 +65,7 @@ func CreateBaseline(store *services.Store) http.HandlerFunc {
 		}
 		if err := store.CreateDoc(ctx, docID, rec); err != nil {
 			log.Printf("create-baseline: CreateDoc: %v", err)
-			writeErr(w, "Something went wrong. Please try again.")
+			writeActionErr(w, "Something went wrong. Please try again.")
 			return
 		}
 
@@ -74,6 +79,6 @@ func CreateBaseline(store *services.Store) http.HandlerFunc {
 		// Fetch collaborators to pre-populate the signer picker.
 		// For MVP, return empty list; Drive collaborator fetch is Phase 2.
 		var collaborators []cards.Collaborator
-		writeJSON(w, cards.AddSigners(collaborators))
+		writeJSON(w, cards.Push(cards.AddSigners(collaborators, docID)))
 	}
 }

@@ -23,16 +23,30 @@ func Homepage(store *services.Store) http.HandlerFunc {
 		}
 
 		docID := ev.Docs.ID
+		log.Printf("homepage: docs.id=%q user=%s", docID, userEmail)
 		if docID == "" {
-			writeErr(w, "Could not determine document ID.")
-			return
+			// Homepage triggers don't include docs.id for HTTP add-ons.
+			// Fall back to the most recently viewed Google Doc via Drive API.
+			token := ev.AuthorizationEventObject.UserOAuthToken
+			if token == "" {
+				writeErr(w, "Could not determine document. Please reopen the add-on.")
+				return
+			}
+			var title string
+			var ferr error
+			docID, title, ferr = services.MostRecentDocID(ctx, token)
+			if ferr != nil {
+				log.Printf("homepage: MostRecentDocID: %v", ferr)
+				writeErr(w, "Could not identify the current document. Please reopen the add-on.")
+				return
+			}
+			_ = title
 		}
 
 		doc, err := store.GetDoc(ctx, docID)
 		if err != nil {
 			if isNotFound(err) {
-				// No baseline exists for this doc yet.
-				writeJSON(w, cards.EmptyState(true)) // assume owner for empty state
+				writeJSON(w, cards.EmptyState(true, docID))
 				return
 			}
 			log.Printf("homepage: GetDoc %s: %v", docID, err)
@@ -51,20 +65,19 @@ func Homepage(store *services.Store) http.HandlerFunc {
 
 		if isOwner {
 			signerStatuses := toSignerStatusList(signerMap)
-			writeJSON(w, cards.StatusOwner(doc.Title, signerStatuses))
+			writeJSON(w, cards.StatusOwner(doc.Title, signerStatuses, docID))
 			return
 		}
 
 		// Signer view
 		signerRec, exists := signerMap[userEmail]
 		if !exists {
-			// Not owner, not a signer.
-			writeJSON(w, cards.EmptyState(false))
+			writeJSON(w, cards.EmptyState(false, docID))
 			return
 		}
 
 		ss := recordToStatus(userEmail, signerRec)
-		writeJSON(w, cards.StatusSigner(doc.Title, ss, ""))
+		writeJSON(w, cards.StatusSigner(doc.Title, ss, "", docID))
 	}
 }
 

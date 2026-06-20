@@ -2,7 +2,7 @@ package cards
 
 import "fmt"
 
-func GmailReview(docID, docTitle, requesterEmail, requesterMessage string) Response {
+func GmailReview(docID, docTitle, requesterEmail, requesterMessage string) Card {
 	docURL := fmt.Sprintf("https://docs.google.com/document/d/%s", docID)
 
 	widgets := []Widget{
@@ -21,11 +21,11 @@ func GmailReview(docID, docTitle, requesterEmail, requesterMessage string) Respo
 		}},
 	})
 
-	return Push(Card{
+	return Card{
 		Name:   "gmail_review",
 		Header: &Header{Title: "Review requested"},
 		Sections: []Section{
 			{Widgets: widgets},
 		},
-	})
+	}
 }

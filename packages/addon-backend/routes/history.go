@@ -20,11 +20,11 @@ func History(store *services.Store) http.HandlerFunc {
 			return
 		}
 
-		docID := ev.Docs.ID
+		docID := ev.resolveDocID()
 		recs, err := store.ListHistory(ctx, docID)
 		if err != nil {
 			log.Printf("history: ListHistory: %v", err)
-			writeErr(w, "Something went wrong. Please try again.")
+			writeActionErr(w, "Something went wrong. Please try again.")
 			return
 		}
 
@@ -38,6 +38,6 @@ func History(store *services.Store) http.HandlerFunc {
 				Timestamp:     rec.Timestamp,
 			}
 		}
-		writeJSON(w, cards.HistoryView(entries))
+		writeJSON(w, cards.Push(cards.HistoryView(entries)))
 	}
 }

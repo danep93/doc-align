@@ -1,16 +1,17 @@
 package cards
 
-// Top-level response Google expects from every add-on endpoint.
-type Response struct {
-	RenderActions RenderActions `json:"renderActions"`
-}
+// BaseURL is the public HTTPS base URL of this server (e.g. ngrok URL).
+// Must be set at startup. Action button functions are relative paths that get prefixed with this.
+var BaseURL string
 
+// RenderActions is the top-level response for action callbacks (button clicks).
+// Homepage triggers return a Card directly instead.
 type RenderActions struct {
-	Action Action `json:"action"`
+	Action ActionNav `json:"action"`
 }
 
-type Action struct {
-	Navigation Navigation `json:"navigation"`
+type ActionNav struct {
+	Navigations []Navigation `json:"navigations"`
 }
 
 type Navigation struct {
@@ -61,9 +62,14 @@ type DecoratedText struct {
 }
 
 type Icon struct {
-	KnownIcon  string `json:"knownIcon,omitempty"`
-	IconUrl    string `json:"iconUrl,omitempty"`
-	AltText    string `json:"altText,omitempty"`
+	KnownIcon    string        `json:"knownIcon,omitempty"`
+	IconUrl      string        `json:"iconUrl,omitempty"`
+	MaterialIcon *MaterialIcon `json:"materialIcon,omitempty"`
+	AltText      string        `json:"altText,omitempty"`
+}
+
+type MaterialIcon struct {
+	Name string `json:"name"`
 }
 
 type ButtonList struct {
@@ -90,8 +96,9 @@ type OnClick struct {
 }
 
 type FormAction struct {
-	Function   string      `json:"function"`
-	Parameters []Parameter `json:"parameters,omitempty"`
+	Function    string      `json:"function"`
+	Parameters  []Parameter `json:"parameters,omitempty"`
+	Interaction string      `json:"interaction,omitempty"` // e.g. "REQUEST_FILE_SCOPE"
 }
 
 type Parameter struct {
@@ -125,38 +132,26 @@ type SelectionItem struct {
 	Selected bool   `json:"selected,omitempty"`
 }
 
-// Helper: build a push-card response.
-func Push(card Card) Response {
-	return Response{
-		RenderActions: RenderActions{
-			Action: Action{
-				Navigation: Navigation{
-					PushCard: &card,
-				},
-			},
-		},
-	}
+// Push returns a RenderActions that pushes card onto the navigation stack.
+func Push(card Card) RenderActions {
+	return RenderActions{Action: ActionNav{Navigations: []Navigation{{PushCard: &card}}}}
 }
 
-// Helper: build an update-card response (replaces current card in stack).
-func Update(card Card) Response {
-	return Response{
-		RenderActions: RenderActions{
-			Action: Action{
-				Navigation: Navigation{
-					UpdateCard: &card,
-				},
-			},
-		},
-	}
+// Update returns a RenderActions that replaces the current card in the stack.
+func Update(card Card) RenderActions {
+	return RenderActions{Action: ActionNav{Navigations: []Navigation{{UpdateCard: &card}}}}
 }
 
 func actionButton(text, function string, params ...Parameter) Button {
+	fn := function
+	if len(fn) > 0 && fn[0] == '/' {
+		fn = BaseURL + fn
+	}
 	return Button{
 		Text: text,
 		OnClick: OnClick{
 			Action: &FormAction{
-				Function:   function,
+				Function:   fn,
 				Parameters: params,
 			},
 		},
@@ -172,4 +167,8 @@ func linkButton(text, url string) Button {
 
 func knownIcon(name string) *Icon {
 	return &Icon{KnownIcon: name}
+}
+
+func matIcon(name string) *Icon {
+	return &Icon{MaterialIcon: &MaterialIcon{Name: name}}
 }

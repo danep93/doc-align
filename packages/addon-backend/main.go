@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"cloud.google.com/go/firestore"
+	"github.com/doc-align/addon-backend/cards"
 	"github.com/doc-align/addon-backend/middleware"
 	"github.com/doc-align/addon-backend/routes"
 	"github.com/doc-align/addon-backend/services"
@@ -14,6 +15,11 @@ import (
 
 func main() {
 	ctx := context.Background()
+
+	cards.BaseURL = os.Getenv("BASE_URL")
+	if cards.BaseURL == "" {
+		log.Fatal("BASE_URL must be set (e.g. https://xxxx.ngrok-free.dev)")
+	}
 
 	projectID := os.Getenv("FIREBASE_PROJECT_ID")
 	if projectID == "" {
@@ -39,6 +45,7 @@ func main() {
 	}
 
 	mux.Handle("POST /addon/homepage", protected(routes.Homepage(store)))
+	mux.Handle("POST /addon/on-file-scope-granted", protected(routes.OnFileScopeGranted(store)))
 	mux.Handle("POST /addon/create-baseline", protected(routes.CreateBaseline(store)))
 	mux.Handle("POST /addon/save-signers", protected(routes.SaveSigners(store)))
 	mux.Handle("POST /addon/sign-form", protected(routes.SignForm()))

@@ -10,7 +10,12 @@ import (
 func SignForm() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userEmail := middleware.EmailFromContext(r.Context())
-		// Commit message suggestion (Claude Haiku) is Phase 2.
-		writeJSON(w, cards.SignForm(userEmail, ""))
+		ev, err := decodeEvent(r)
+		if err != nil {
+			writeActionErr(w, "Something went wrong. Please try again.")
+			return
+		}
+		docID := ev.resolveDocID()
+		writeJSON(w, cards.Push(cards.SignForm(userEmail, "", docID)))
 	}
 }

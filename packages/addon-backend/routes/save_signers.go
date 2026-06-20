@@ -22,15 +22,15 @@ func SaveSigners(store *services.Store) http.HandlerFunc {
 			return
 		}
 
-		docID := ev.Docs.ID
+		docID := ev.resolveDocID()
 
 		doc, err := store.GetDoc(ctx, docID)
 		if err != nil {
-			writeErr(w, "Document not found. Please create a baseline first.")
+			writeActionErr(w, "Document not found. Please create a baseline first.")
 			return
 		}
 		if doc.OwnerID != userEmail {
-			writeErr(w, "Only the document owner can add signers.")
+			writeActionErr(w, "Only the document owner can add signers.")
 			return
 		}
 
@@ -61,6 +61,6 @@ func SaveSigners(store *services.Store) http.HandlerFunc {
 		// Return owner status card.
 		signerMap, _ := store.ListSigners(ctx, docID)
 		signerStatuses := toSignerStatusList(signerMap)
-		writeJSON(w, cards.StatusOwner(doc.Title, signerStatuses))
+		writeJSON(w, cards.Push(cards.StatusOwner(doc.Title, signerStatuses, docID)))
 	}
 }

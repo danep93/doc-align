@@ -5,7 +5,7 @@ type Collaborator struct {
 	DisplayName string
 }
 
-func AddSigners(collaborators []Collaborator) Response {
+func AddSigners(collaborators []Collaborator, docID string) Card {
 	items := make([]SelectionItem, len(collaborators))
 	for i, c := range collaborators {
 		label := c.DisplayName
@@ -33,16 +33,17 @@ func AddSigners(collaborators []Collaborator) Response {
 		},
 		{
 			ButtonList: &ButtonList{Buttons: []Button{
-				actionButton("Done", "/addon/save-signers"),
+				actionButton("Done", "/addon/save-signers",
+				Parameter{Key: "docId", Value: docID}),
 			}},
 		},
 	}
 
-	return Push(Card{
+	return Card{
 		Name:   "add_signers",
 		Header: &Header{Title: "Add signers"},
 		Sections: []Section{
 			{Widgets: widgets},
 		},
-	})
+	}
 }

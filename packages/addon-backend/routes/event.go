@@ -3,6 +3,8 @@ package routes
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/doc-align/addon-backend/cards"
 )
 
 // AddonEvent is the JSON body Google sends to every HTTPS add-on endpoint.
@@ -69,47 +71,35 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 	json.NewEncoder(w).Encode(v)
 }
 
-// writeErr writes a minimal error card response.
+// writeErr writes a bare Card error. Use only for homepage triggers.
 func writeErr(w http.ResponseWriter, msg string) {
-	type errCard struct {
-		RenderActions struct {
-			Action struct {
-				Navigation struct {
-					PushCard struct {
-						Name     string `json:"name"`
-						Sections []struct {
-							Widgets []struct {
-								TextParagraph struct {
-									Text string `json:"text"`
-								} `json:"textParagraph"`
-							} `json:"widgets"`
-						} `json:"sections"`
-					} `json:"pushCard"`
-				} `json:"navigation"`
-			} `json:"action"`
-		} `json:"renderActions"`
-	}
-	var resp errCard
-	resp.RenderActions.Action.Navigation.PushCard.Name = "error"
-	resp.RenderActions.Action.Navigation.PushCard.Sections = []struct {
-		Widgets []struct {
-			TextParagraph struct {
-				Text string `json:"text"`
-			} `json:"textParagraph"`
-		} `json:"widgets"`
-	}{
-		{
-			Widgets: []struct {
-				TextParagraph struct {
-					Text string `json:"text"`
-				} `json:"textParagraph"`
-			}{
-				{TextParagraph: struct {
-					Text string `json:"text"`
-				}{Text: msg}},
-			},
+	writeJSON(w, cards.Card{
+		Name: "error",
+		Sections: []cards.Section{
+			{Widgets: []cards.Widget{
+				{TextParagraph: &cards.TextParagraph{Text: msg}},
+			}},
 		},
+	})
+}
+
+// writeActionErr writes an error card wrapped in RenderActions, required for action callbacks.
+func writeActionErr(w http.ResponseWriter, msg string) {
+	writeJSON(w, cards.Push(cards.Card{
+		Name: "error",
+		Sections: []cards.Section{
+			{Widgets: []cards.Widget{
+				{TextParagraph: &cards.TextParagraph{Text: msg}},
+			}},
+		},
+	}))
+}
+
+// resolveDocID returns the document ID from the action parameter (embedded by card builders)
+// or falls back to the docs field in the event (populated in action callbacks, not homepage triggers).
+func (ev AddonEvent) resolveDocID() string {
+	if id := ev.param("docId"); id != "" {
+		return id
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	return ev.Docs.ID
 }

@@ -14,7 +14,7 @@ type DiffLine struct {
 	Text string
 }
 
-func DiffView(added, removed int, sections []DiffSection) Response {
+func DiffView(added, removed int, sections []DiffSection) Card {
 	summary := fmt.Sprintf("+%d added · -%d removed", added, removed)
 
 	cardSections := []Section{
@@ -58,9 +58,9 @@ func DiffView(added, removed int, sections []DiffSection) Response {
 		},
 	})
 
-	return Push(Card{
+	return Card{
 		Name:     "diff_view",
 		Header:   &Header{Title: "What changed"},
 		Sections: cardSections,
-	})
+	}
 }

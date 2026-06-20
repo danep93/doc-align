@@ -2,7 +2,7 @@ package cards
 
 import "fmt"
 
-func GmailDrift(docID, docTitle string, added, removed int, sections []DiffSection) Response {
+func GmailDrift(docID, docTitle string, added, removed int, sections []DiffSection) Card {
 	docURL := fmt.Sprintf("https://docs.google.com/document/d/%s", docID)
 
 	cardSections := []Section{
@@ -38,9 +38,9 @@ func GmailDrift(docID, docTitle string, added, removed int, sections []DiffSecti
 		},
 	})
 
-	return Push(Card{
+	return Card{
 		Name:     "gmail_drift",
 		Header:   &Header{Title: docTitle, Subtitle: "Document changed"},
 		Sections: cardSections,
-	})
+	}
 }

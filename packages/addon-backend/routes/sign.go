@@ -21,11 +21,10 @@ func Sign(store *services.Store) http.HandlerFunc {
 			return
 		}
 
-		docID := ev.Docs.ID
+		docID := ev.resolveDocID()
 		userToken := ev.AuthorizationEventObject.UserOAuthToken
 		commitMsg := ev.formString("commitMessage")
 
-		// Get the current revision ID to store with the sign-off.
 		revID, err := services.LatestRevisionID(ctx, userToken, docID)
 		if err != nil {
 			log.Printf("sign: LatestRevisionID: %v (non-fatal)", err)
@@ -33,12 +32,12 @@ func Sign(store *services.Store) http.HandlerFunc {
 
 		now := time.Now()
 		if err := store.UpdateSignerStatus(ctx, docID, userEmail, "signed", map[string]interface{}{
-			"signedAt":        now,
+			"signedAt":         now,
 			"signedRevisionId": revID,
-			"commitMessage":   commitMsg,
+			"commitMessage":    commitMsg,
 		}); err != nil {
 			log.Printf("sign: UpdateSignerStatus: %v", err)
-			writeErr(w, "Something went wrong. Please try again.")
+			writeActionErr(w, "Something went wrong. Please try again.")
 			return
 		}
 
@@ -52,13 +51,13 @@ func Sign(store *services.Store) http.HandlerFunc {
 
 		doc, err := store.GetDoc(ctx, docID)
 		if err != nil {
-			writeErr(w, "Something went wrong. Please try again.")
+			writeActionErr(w, "Something went wrong. Please try again.")
 			return
 		}
 
 		signerMap, _ := store.ListSigners(ctx, docID)
 		rec := signerMap[userEmail]
 		ss := recordToStatus(userEmail, rec)
-		writeJSON(w, cards.StatusSigner(doc.Title, ss, ""))
+		writeJSON(w, cards.Push(cards.StatusSigner(doc.Title, ss, "", docID)))
 	}
 }

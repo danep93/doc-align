@@ -21,7 +21,7 @@ func QuickSign(store *services.Store) http.HandlerFunc {
 			return
 		}
 
-		docID := ev.Docs.ID
+		docID := ev.resolveDocID()
 		userToken := ev.AuthorizationEventObject.UserOAuthToken
 		message := ev.param("message")
 
@@ -37,7 +37,7 @@ func QuickSign(store *services.Store) http.HandlerFunc {
 			"commitMessage":    message,
 		}); err != nil {
 			log.Printf("quick-sign: UpdateSignerStatus: %v", err)
-			writeErr(w, "Something went wrong. Please try again.")
+			writeActionErr(w, "Something went wrong. Please try again.")
 			return
 		}
 
@@ -53,6 +53,6 @@ func QuickSign(store *services.Store) http.HandlerFunc {
 		signerMap, _ := store.ListSigners(ctx, docID)
 		rec := signerMap[userEmail]
 		ss := recordToStatus(userEmail, rec)
-		writeJSON(w, cards.StatusSigner(doc.Title, ss, ""))
+		writeJSON(w, cards.Push(cards.StatusSigner(doc.Title, ss, "", docID)))
 	}
 }
