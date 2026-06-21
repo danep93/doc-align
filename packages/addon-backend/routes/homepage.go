@@ -28,12 +28,21 @@ func Homepage(store *services.Store) http.HandlerFunc {
 			ev.AuthorizationEventObject.AuthorizedScopes, userEmail)
 
 		if docID == "" {
-			// docs.id is absent — show a card with REQUEST_FILE_SCOPE button.
-			// When the user clicks, Google requests per-file drive.file access for the
-			// currently open document and fires onFileScopeGrantedTrigger with docs.id.
-			log.Printf("homepage: docs.id absent — showing connect card")
-			writeJSON(w, cards.ConnectDocument())
-			return
+			// docs.id is absent (drive.file is globally pre-authorized, skipping per-file grant).
+			// Fall back to Drive API: the most-recently-viewed Doc is the one currently open.
+			userToken := ev.AuthorizationEventObject.UserOAuthToken
+			if userToken != "" {
+				if id, err := services.MostRecentDocID(ctx, userToken); err == nil {
+					log.Printf("homepage: auto-detected docID=%q via drive.readonly", id)
+					docID = id
+				} else {
+					log.Printf("homepage: MostRecentDocID failed: %v", err)
+				}
+			}
+			if docID == "" {
+				writeErr(w, "Could not detect the current document. Please close and reopen the sidebar.")
+				return
+			}
 		}
 
 		doc, err := store.GetDoc(ctx, docID)
