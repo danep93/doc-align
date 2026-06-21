@@ -14,8 +14,8 @@ import (
 // OnFileScopeGranted handles the onFileScopeGrantedTrigger, which fires after the user
 // grants drive.file access for the current document.
 // In production: docs.id is populated — show the correct card.
-// In test mode: Google skips the per-file dialog so docs.id is empty — pop to root so
-// the homepage re-fires; the scope is now granted so addonHasFileScopePermission=true there.
+// Fallback: when docs.id is absent, pop to root so the homepage re-fires; with the scope
+// now granted, addonHasFileScopePermission=true and docs.id will be correctly populated.
 func OnFileScopeGranted(store *services.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -27,15 +27,13 @@ func OnFileScopeGranted(store *services.Store) http.HandlerFunc {
 			return
 		}
 
-		docID := ev.Docs.ID
+		docID := ev.resolveDocID()
 		log.Printf("on-file-scope-granted: docs.id=%q user=%s", docID, userEmail)
 
 		if docID == "" {
-			// Test mode: drive.file was already globally authorized so Google skipped the
-			// per-file dialog and fired this trigger without docs.id. Show the manual
-			// attach card so the user can paste the doc URL and break the loop.
-			log.Printf("on-file-scope-granted: docs.id empty (test mode), showing attach card")
-			writeJSON(w, cards.Push(cards.AttachDocument()))
+			// docs.id still absent after scope grant — show connect card to retry.
+			log.Printf("on-file-scope-granted: docs.id empty after scope grant — showing connect card")
+			writeJSON(w, cards.Push(cards.ConnectDocument()))
 			return
 		}
 

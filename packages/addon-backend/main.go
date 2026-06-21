@@ -45,8 +45,6 @@ func main() {
 	}
 
 	mux.Handle("POST /addon/homepage", protected(routes.Homepage(store)))
-	mux.Handle("POST /addon/attach-document", protected(routes.ShowAttachDocument()))
-	mux.Handle("POST /addon/attach-document-submit", protected(routes.SubmitAttachDocument(store)))
 	mux.Handle("POST /addon/on-file-scope-granted", protected(routes.OnFileScopeGranted(store)))
 	mux.Handle("POST /addon/create-baseline", protected(routes.CreateBaseline(store)))
 	mux.Handle("POST /addon/add-signers", protected(routes.AddSigners(store)))

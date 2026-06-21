@@ -20,6 +20,22 @@ type Navigation struct {
 	PopToRoot  bool  `json:"popToRoot,omitempty"`
 }
 
+// requestingGoogleScopes is the JSON response that triggers Google's granular consent flow.
+// The homepage (or any endpoint) returns this instead of a Card to request missing scopes.
+// After the user grants, Google re-fires the same trigger with the new scope in authorizedScopes.
+type requestingGoogleScopes struct {
+	RequestingGoogleScopes struct {
+		Scopes []string `json:"scopes"`
+	} `json:"requesting_google_scopes"`
+}
+
+// RequestingScopes builds the granular-consent response that asks Google for the given scope.
+func RequestingScopes(scope string) requestingGoogleScopes {
+	var r requestingGoogleScopes
+	r.RequestingGoogleScopes.Scopes = []string{scope}
+	return r
+}
+
 // PopRoot returns a RenderActions that clears the card stack and re-triggers the homepage.
 func PopRoot() RenderActions {
 	return RenderActions{Action: ActionNav{Navigations: []Navigation{{PopToRoot: true}}}}
@@ -37,13 +53,6 @@ type Card struct {
 type CardAction struct {
 	ActionLabel string  `json:"actionLabel"`
 	OnClick     OnClick `json:"onClick"`
-}
-
-func attachDocAction() CardAction {
-	return CardAction{
-		ActionLabel: "Attach document",
-		OnClick:     OnClick{Action: &FormAction{Function: BaseURL + "/addon/attach-document"}},
-	}
 }
 
 type Header struct {

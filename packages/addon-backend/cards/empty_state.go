@@ -1,44 +1,9 @@
 package cards
 
-func ConnectDocument(docID string) Card {
-	params := []Parameter{}
-	if docID != "" {
-		params = []Parameter{{Key: "docId", Value: docID}}
-	}
-	return Card{
-		Name:        "connect_document",
-		CardActions: []CardAction{attachDocAction()},
-		Sections: []Section{
-			{
-				Widgets: []Widget{
-					{DecoratedText: &DecoratedText{
-						StartIcon:   matIcon("lock"),
-						Text:        "doc-align",
-						BottomLabel: "Needs one-time access to this document to track sign-offs.",
-						WrapText:    true,
-					}},
-					{ButtonList: &ButtonList{Buttons: []Button{
-						{
-							Text: "Open doc-align",
-							Type: "FILLED",
-							OnClick: &OnClick{Action: &FormAction{
-								Function:    BaseURL + "/addon/on-file-scope-granted",
-								Interaction: 2, // REQUEST_FILE_SCOPE
-								Parameters:  params,
-							}},
-						},
-					}}},
-				},
-			},
-		},
-	}
-}
-
 func EmptyState(isOwner bool, docID string) Card {
 	if isOwner {
 		return Card{
-			Name:        "empty_state",
-			CardActions: []CardAction{attachDocAction()},
+			Name:   "empty_state",
 			Header: &Header{
 				Title:    "doc-align",
 				Subtitle: "Document alignment for Google Docs",
@@ -78,9 +43,8 @@ func EmptyState(isOwner bool, docID string) Card {
 		}
 	}
 	return Card{
-		Name:        "empty_state_signer",
-		CardActions: []CardAction{attachDocAction()},
-		Header:      &Header{Title: "doc-align"},
+		Name:   "empty_state_signer",
+		Header: &Header{Title: "doc-align"},
 		Sections: []Section{
 			{
 				Widgets: []Widget{

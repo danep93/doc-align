@@ -1,7 +1,10 @@
 package routes
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
+	"log"
 	"net/http"
 
 	"github.com/doc-align/addon-backend/cards"
@@ -10,21 +13,21 @@ import (
 // AddonEvent is the JSON body Google sends to every HTTPS add-on endpoint.
 type AddonEvent struct {
 	Docs struct {
-		ID                       string `json:"id"`
-		Title                    string `json:"title"`
-		AddonHasFileScopePermission bool `json:"addonHasFileScopePermission"`
+		ID                          string `json:"id"`
+		Title                       string `json:"title"`
+		AddonHasFileScopePermission bool   `json:"addonHasFileScopePermission"`
 	} `json:"docs"`
 	Gmail struct {
 		MessageID string `json:"messageId"`
 	} `json:"gmail"`
 	AuthorizationEventObject struct {
-		UserOAuthToken string `json:"userOAuthToken"`
+		UserOAuthToken  string   `json:"userOAuthToken"`
+		AuthorizedScopes []string `json:"authorizedScopes"`
 	} `json:"authorizationEventObject"`
 	FormInput struct {
-		// Card form field values are nested under formInput.
-		SignerEmails   []string `json:"signerEmails"`
-		CustomEmail    string   `json:"customEmail"`
-		CommitMessage  string   `json:"commitMessage"`
+		SignerEmails  []string `json:"signerEmails"`
+		CustomEmail   string   `json:"customEmail"`
+		CommitMessage string   `json:"commitMessage"`
 	} `json:"formInput"`
 	CommonEventObject struct {
 		FormInputs map[string]struct {
@@ -36,10 +39,15 @@ type AddonEvent struct {
 	} `json:"commonEventObject"`
 }
 
-// decodeEvent decodes the request body into an AddonEvent.
+// decodeEvent decodes the request body into an AddonEvent and logs the raw JSON for debugging.
 func decodeEvent(r *http.Request) (AddonEvent, error) {
+	raw, err := io.ReadAll(r.Body)
+	if err != nil {
+		return AddonEvent{}, err
+	}
+	log.Printf("RAW EVENT [%s]: %s", r.URL.Path, raw)
 	var ev AddonEvent
-	err := json.NewDecoder(r.Body).Decode(&ev)
+	err = json.NewDecoder(bytes.NewReader(raw)).Decode(&ev)
 	return ev, err
 }
 
@@ -94,6 +102,16 @@ func writeActionErr(w http.ResponseWriter, msg string) {
 			}},
 		},
 	}))
+}
+
+// hasScope reports whether scope is present in the event's authorizedScopes list.
+func (ev AddonEvent) hasScope(scope string) bool {
+	for _, s := range ev.AuthorizationEventObject.AuthorizedScopes {
+		if s == scope {
+			return true
+		}
+	}
+	return false
 }
 
 // resolveDocID returns the document ID from the action parameter (embedded by card builders)
