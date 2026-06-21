@@ -23,11 +23,16 @@ func Homepage(store *services.Store) http.HandlerFunc {
 		}
 
 		docID := ev.Docs.ID
-		log.Printf("homepage: docs.id=%q title=%q scope=%v user=%s", docID, ev.Docs.Title, ev.Docs.AddonHasFileScopePermission, userEmail)
-		if !ev.Docs.AddonHasFileScopePermission {
-			// drive.file scope not yet granted for this doc. Show the normal EmptyState UI
-			// whose "Get started" CTA triggers REQUEST_FILE_SCOPE — no separate gate page.
-			writeJSON(w, cards.EmptyStateRequestScope())
+		log.Printf("homepage: docs.id=%q title=%q scope=%v authorizedScopes=%v user=%s",
+			docID, ev.Docs.Title, ev.Docs.AddonHasFileScopePermission,
+			ev.AuthorizationEventObject.AuthorizedScopes, userEmail)
+
+		if docID == "" {
+			// docs.id is absent — show a card with REQUEST_FILE_SCOPE button.
+			// When the user clicks, Google requests per-file drive.file access for the
+			// currently open document and fires onFileScopeGrantedTrigger with docs.id.
+			log.Printf("homepage: docs.id absent — showing connect card")
+			writeJSON(w, cards.ConnectDocument())
 			return
 		}
 

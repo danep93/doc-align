@@ -31,11 +31,9 @@ func OnFileScopeGranted(store *services.Store) http.HandlerFunc {
 		log.Printf("on-file-scope-granted: docs.id=%q user=%s", docID, userEmail)
 
 		if docID == "" {
-			// docs.id is absent — Google didn't propagate it in this trigger event.
-			// Pop to root: the homepage will re-fire in the context of the same open doc,
-			// and with the scope now granted it will receive docs.id correctly.
-			log.Printf("on-file-scope-granted: docs.id empty, popping to root for homepage re-fire")
-			writeJSON(w, cards.PopRoot())
+			// docs.id still absent after scope grant — show connect card to retry.
+			log.Printf("on-file-scope-granted: docs.id empty after scope grant — showing connect card")
+			writeJSON(w, cards.Push(cards.ConnectDocument()))
 			return
 		}
 

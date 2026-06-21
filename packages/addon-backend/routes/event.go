@@ -21,7 +21,8 @@ type AddonEvent struct {
 		MessageID string `json:"messageId"`
 	} `json:"gmail"`
 	AuthorizationEventObject struct {
-		UserOAuthToken string `json:"userOAuthToken"`
+		UserOAuthToken  string   `json:"userOAuthToken"`
+		AuthorizedScopes []string `json:"authorizedScopes"`
 	} `json:"authorizationEventObject"`
 	FormInput struct {
 		SignerEmails  []string `json:"signerEmails"`
@@ -101,6 +102,16 @@ func writeActionErr(w http.ResponseWriter, msg string) {
 			}},
 		},
 	}))
+}
+
+// hasScope reports whether scope is present in the event's authorizedScopes list.
+func (ev AddonEvent) hasScope(scope string) bool {
+	for _, s := range ev.AuthorizationEventObject.AuthorizedScopes {
+		if s == scope {
+			return true
+		}
+	}
+	return false
 }
 
 // resolveDocID returns the document ID from the action parameter (embedded by card builders)
