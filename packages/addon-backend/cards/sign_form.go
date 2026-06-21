@@ -5,10 +5,10 @@ func SignForm(userEmail string, suggestedCommitMessage string, docID string) Car
 		{TextParagraph: &TextParagraph{Text: "Quick sign:"}},
 		{
 			ButtonList: &ButtonList{Buttons: []Button{
-				actionButton("LGTM", "/addon/quick-sign", Parameter{Key: "message", Value: "LGTM"}, Parameter{Key: "docId", Value: docID}),
-				actionButton("Approved", "/addon/quick-sign", Parameter{Key: "message", Value: "Approved"}, Parameter{Key: "docId", Value: docID}),
-				actionButton("Looks good", "/addon/quick-sign", Parameter{Key: "message", Value: "Looks good"}, Parameter{Key: "docId", Value: docID}),
-				actionButton("Signed off", "/addon/quick-sign", Parameter{Key: "message", Value: "Signed off"}, Parameter{Key: "docId", Value: docID}),
+				outlinedActionButton("LGTM", "/addon/quick-sign", Parameter{Key: "message", Value: "LGTM"}, Parameter{Key: "docId", Value: docID}),
+				outlinedActionButton("Approved", "/addon/quick-sign", Parameter{Key: "message", Value: "Approved"}, Parameter{Key: "docId", Value: docID}),
+				outlinedActionButton("Looks good", "/addon/quick-sign", Parameter{Key: "message", Value: "Looks good"}, Parameter{Key: "docId", Value: docID}),
+				outlinedActionButton("Signed off", "/addon/quick-sign", Parameter{Key: "message", Value: "Signed off"}, Parameter{Key: "docId", Value: docID}),
 			}},
 		},
 		{
@@ -21,8 +21,8 @@ func SignForm(userEmail string, suggestedCommitMessage string, docID string) Car
 		},
 		{
 			ButtonList: &ButtonList{Buttons: []Button{
-				actionButton("Sign", "/addon/sign", Parameter{Key: "docId", Value: docID}),
-				actionButton("Cancel", "/addon/homepage"),
+				filledActionButton("Sign", "/addon/sign", Parameter{Key: "docId", Value: docID}),
+				outlinedActionButton("Cancel", "/addon/homepage"),
 			}},
 		},
 	}

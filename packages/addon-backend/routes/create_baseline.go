@@ -76,9 +76,23 @@ func CreateBaseline(store *services.Store) http.HandlerFunc {
 			Timestamp:  time.Now(),
 		})
 
-		// Fetch collaborators to pre-populate the signer picker.
-		// For MVP, return empty list; Drive collaborator fetch is Phase 2.
+		// Fetch collaborators from Drive permissions, excluding the owner.
 		var collaborators []cards.Collaborator
+		if userToken != "" {
+			if perms, err := services.ListFilePermissions(ctx, userToken, docID); err == nil {
+				for _, p := range perms {
+					if p.EmailAddress != "" && p.EmailAddress != userEmail {
+						collaborators = append(collaborators, cards.Collaborator{
+							Email:       p.EmailAddress,
+							DisplayName: p.DisplayName,
+						})
+					}
+				}
+			} else {
+				log.Printf("create-baseline: ListFilePermissions %s: %v", docID, err)
+			}
+		}
+
 		writeJSON(w, cards.Push(cards.AddSigners(collaborators, docID)))
 	}
 }

@@ -23,24 +23,14 @@ func Homepage(store *services.Store) http.HandlerFunc {
 		}
 
 		docID := ev.Docs.ID
-		log.Printf("homepage: docs.id=%q user=%s", docID, userEmail)
-		if docID == "" {
-			// Homepage triggers don't include docs.id for HTTP add-ons.
-			// Fall back to the most recently viewed Google Doc via Drive API.
-			token := ev.AuthorizationEventObject.UserOAuthToken
-			if token == "" {
-				writeErr(w, "Could not determine document. Please reopen the add-on.")
-				return
-			}
-			var title string
-			var ferr error
-			docID, title, ferr = services.MostRecentDocID(ctx, token)
-			if ferr != nil {
-				log.Printf("homepage: MostRecentDocID: %v", ferr)
-				writeErr(w, "Could not identify the current document. Please reopen the add-on.")
-				return
-			}
-			_ = title
+		log.Printf("homepage: docs.id=%q title=%q scope=%v user=%s", docID, ev.Docs.Title, ev.Docs.AddonHasFileScopePermission, userEmail)
+		if !ev.Docs.AddonHasFileScopePermission {
+			// drive.file scope not granted for the *current* document.
+			// docs.id may be stale (previous doc) in production, but in test deployments
+			// where drive.file is globally authorized, it IS the current doc — embed it as
+			// a hint so onFileScopeGranted can avoid Drive API fallbacks that pick the wrong doc.
+			writeJSON(w, cards.ConnectDocument(docID))
+			return
 		}
 
 		doc, err := store.GetDoc(ctx, docID)

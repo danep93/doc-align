@@ -28,8 +28,6 @@ func StatusOwner(docTitle string, signers []SignerStatus, docID string) Card {
 		}
 	}
 
-	summary := fmt.Sprintf("%d signed · %d drifted · %d pending", signed, drifted, pending)
-
 	// Sort: drifted first, then pending, then signed.
 	sorted := make([]SignerStatus, 0, len(signers))
 	for _, s := range signers {
@@ -48,7 +46,7 @@ func StatusOwner(docTitle string, signers []SignerStatus, docID string) Card {
 		}
 	}
 
-	signerWidgets := make([]Widget, 0, len(sorted))
+	signerWidgets := make([]Widget, 0, len(sorted)*2)
 	for _, s := range sorted {
 		icon := statusIconWidget(s.Status)
 		label := s.DisplayName
@@ -72,7 +70,7 @@ func StatusOwner(docTitle string, signers []SignerStatus, docID string) Card {
 		if s.Status == "drifted" {
 			signerWidgets = append(signerWidgets, Widget{
 				ButtonList: &ButtonList{Buttons: []Button{
-					actionButton("View changes", "/addon/diff",
+					outlinedActionButton("Notify & re-review", "/addon/diff",
 						Parameter{Key: "signerEmail", Value: s.Email},
 						Parameter{Key: "docId", Value: docID}),
 				}},
@@ -80,36 +78,38 @@ func StatusOwner(docTitle string, signers []SignerStatus, docID string) Card {
 		}
 	}
 
-	footerWidgets := []Widget{
-		{ButtonList: &ButtonList{Buttons: []Button{
-			actionButton("Invite signers", "/addon/save-signers",
-				Parameter{Key: "docId", Value: docID}),
-			actionButton("History", "/addon/history",
-				Parameter{Key: "docId", Value: docID}),
-		}}},
-	}
-
-	sections := []Section{
-		{
-			Widgets: []Widget{
-				{TextParagraph: &TextParagraph{Text: summary}},
-			},
-		},
-		{
-			Header:   "Signers",
-			Widgets:  signerWidgets,
-		},
-		{
-			Widgets: footerWidgets,
-		},
+	if len(signerWidgets) == 0 {
+		signerWidgets = []Widget{
+			{DecoratedText: &DecoratedText{
+				StartIcon:   matIcon("group"),
+				Text:        "No signers yet",
+				BottomLabel: "Add signers to get started.",
+				WrapText:    true,
+			}},
+		}
 	}
 
 	subtitle := fmt.Sprintf("%d of %d signed", signed, len(signers))
 
 	return Card{
-		Name:     "status_owner",
-		Header:   &Header{Title: docTitle, Subtitle: subtitle},
-		Sections: sections,
+		Name:   "status_owner",
+		Header: &Header{Title: docTitle, Subtitle: subtitle},
+		Sections: []Section{
+			{
+				Header:       "Signers",
+				Widgets:      signerWidgets,
+			},
+			{
+				Widgets: []Widget{
+					{ButtonList: &ButtonList{Buttons: []Button{
+						filledActionButton("Add more signers", "/addon/add-signers",
+							Parameter{Key: "docId", Value: docID}),
+						outlinedActionButton("History", "/addon/history",
+							Parameter{Key: "docId", Value: docID}),
+					}}},
+				},
+			},
+		},
 	}
 }
 
