@@ -95,15 +95,11 @@ Document content is **never stored**. Only revision IDs and metadata.
 - **`FormAction.function` must be a full HTTPS URL.**
   `cards.BaseURL` is prepended by `actionButton()`. Never pass a relative path.
 
-- **`docs.id` is NEVER provided in test mode — this is a Google limitation, not a code bug.**
-  In the test account, `drive.file` is globally pre-authorized so Google skips the per-file dialog and sends
-  an empty `docs` object (`{}`) in ALL events (homepage, onFileScopeGranted). There is no server-side fix.
-  In production: the per-file dialog appears → user grants scope → `onFileScopeGrantedTrigger` fires WITH
-  correct `docs.id` → correct card shown. The `ConnectDocument` + `onFileScopeGranted` flow is correct for prod.
-  In test mode: `onFileScopeGranted` returns `popToRoot` when `docs.id` is empty, which re-fires the homepage.
-  The homepage still gets empty `docs.id` and shows ConnectDocument again (an infinite loop of ConnectDocument).
-  **Workaround for local dev:** test on a doc that was previously baseline'd in an earlier session — those docs
-  had `drive.file` granted individually and their subsequent opens have `addonHasFileScopePermission=true`.
+- **`docs.id` behavior on Workspace account (docalign.app):**
+  With a fresh Workspace account and no pre-authorized `drive.file`, the per-file dialog appears normally →
+  `onFileScopeGrantedTrigger` fires WITH correct `docs.id` → correct card shown. This is the expected prod flow.
+  The old personal-Gmail issue (globally pre-authorized `drive.file` → empty `docs` object → infinite
+  ConnectDocument loop) was specific to the developer install on a personal account and should not occur here.
 
 - **Use `materialIcon`, not `knownIcon`.**
   KnownIcon enum is very limited. `HOURGLASS`, `CHECK_CIRCLE`, `WARNING` are invalid and render broken images.
@@ -124,7 +120,7 @@ Document content is **never stored**. Only revision IDs and metadata.
 - **Drift detection wiring** — `services/drift_detection.go` exists but nothing triggers it on homepage open
 - **Owner token / OAuth callback** — `ownerRefreshToken` is never written; need an OAuth callback endpoint; manual Firestore write for testing in the meantime
 - **Diff view** — blocked on `ownerRefreshToken` in Firestore
-- **`docs.id` flow** — production flow is correct. Test env limitation: `docs.id` is always empty (see critical invariants). To test the owner flow locally, open a doc that was previously baseline'd (has a Firestore entry) — that doc will have `addonHasFileScopePermission=true` on reopen.
+- **`docs.id` flow** — should work correctly on the Workspace account (`rraturi@docalign.app`) since `drive.file` is not globally pre-authorized. Per-file dialog appears on first open of each doc.
 - **Email notifications** — SendGrid/Resend integration not built
 - **History card** — not tested
 - **Multi-user flows** — owner + signer in separate accounts
@@ -142,8 +138,8 @@ ngrok http --url=reactor-explore-crumb.ngrok-free.dev 8080
 ```bash
 cd packages/addon-backend
 OIDC_BYPASS=true \
-DEBUG_EMAIL=rhlrtr44@gmail.com \
-FIREBASE_PROJECT_ID=docaligntest \
+DEBUG_EMAIL=rraturi@docalign.app \
+FIREBASE_PROJECT_ID=docalign-prod \
 BASE_URL=https://reactor-explore-crumb.ngrok-free.dev \
 PORT=8080 \
 go run .
@@ -162,17 +158,24 @@ cd packages/addon-backend && go build ./...
 
 | Resource | Value |
 |---|---|
-| GCP project | `docaligntest` (number `841259604072`) |
-| Firestore | Native mode, us-east1 |
-| OAuth consent | External; test user `rhlrtr44@gmail.com` |
+| GCP project | `docalign-prod` (number `856331950906`) |
+| GCP org | `docalign.app` (org ID `904470190675`) |
+| Firestore | Native mode, nam5, free tier |
+| OAuth consent | Internal (docalign.app org only, no Google review needed) |
+| Developer account | `rraturi@docalign.app` |
 | ngrok static URL | `https://reactor-explore-crumb.ngrok-free.dev` |
 | Deployment config | `/tmp/addon-deployment.json` |
+| Add-on deployment | `my-addon` in `docalign-prod` |
 
 **Redeploy after changing ngrok URL or OAuth scopes:**
 ```bash
 gcloud workspace-add-ons deployments replace my-addon \
-  --deployment-file=/tmp/addon-deployment.json
-gcloud workspace-add-ons deployments install my-addon
+  --deployment-file=/tmp/addon-deployment.json \
+  --project=docalign-prod \
+  --account=rraturi@docalign.app
+gcloud workspace-add-ons deployments install my-addon \
+  --project=docalign-prod \
+  --account=rraturi@docalign.app
 ```
 
 ---
