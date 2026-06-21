@@ -1,0 +1,34 @@
+{
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/documents.readonly",
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/drive.readonly",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/gmail.addons.current.message.metadata"
+  ],
+  "addOns": {
+    "common": {
+      "name": "doc-align",
+      "logoUrl": "https://www.gstatic.com/images/branding/product/1x/googleg_48dp.png",
+      "homepageTrigger": {
+        "runFunction": "https://reactor-explore-crumb.ngrok-free.dev/addon/homepage"
+      }
+    },
+    "docs": {
+      "homepageTrigger": {
+        "runFunction": "https://reactor-explore-crumb.ngrok-free.dev/addon/homepage"
+      },
+      "onFileScopeGrantedTrigger": {
+        "runFunction": "https://reactor-explore-crumb.ngrok-free.dev/addon/on-file-scope-granted"
+      }
+    },
+    "gmail": {
+      "contextualTriggers": [
+        {
+          "unconditional": {},
+          "onTriggerFunction": "https://reactor-explore-crumb.ngrok-free.dev/addon/gmail-trigger"
+        }
+      ]
+    }
+  }
+}

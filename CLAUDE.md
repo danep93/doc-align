@@ -127,20 +127,105 @@ Document content is **never stored**. Only revision IDs and metadata.
 
 ---
 
+## Getting Started (new team member)
+
+### Prerequisites
+
+Check each tool is installed — if not, install it first.
+
+**Go 1.22+**
+```bash
+go version   # must be 1.22 or higher
+```
+Not installed? Download from https://go.dev/dl/
+
+**ngrok**
+```bash
+ngrok version
+```
+Not installed? Download from https://ngrok.com/download and create a free account.  
+You need a **static domain** (ngrok free tier gives one). Find yours at https://dashboard.ngrok.com/domains.
+
+**gcloud CLI**
+```bash
+gcloud version
+```
+Not installed? Follow https://cloud.google.com/sdk/docs/install
+
+---
+
+### One-time setup
+
+**1. Get access to the GCP project**
+
+Ask Rahul to:
+- Create a `@docalign.app` Workspace account for you (OAuth consent is Internal — only org members can use the add-on)
+- Add you to `docalign-prod` in GCP with at least the `Cloud Datastore User` role (for Firestore) and `Workspace Add-ons Developer` role
+
+**2. Authenticate gcloud**
+
+Run all commands below from the **repo root** unless otherwise noted.
+
+```bash
+gcloud auth login --account=YOUR_NAME@docalign.app
+gcloud config set account YOUR_NAME@docalign.app
+gcloud config set project docalign-prod
+```
+
+**3. Set up Application Default Credentials (needed for Firestore)**
+```bash
+gcloud auth application-default login
+```
+A browser window opens — sign in with your `@docalign.app` account.
+
+**4. Configure ngrok authtoken**
+
+Log in to https://dashboard.ngrok.com, copy your authtoken from the "Your Authtoken" page, then:
+```bash
+ngrok config add-authtoken YOUR_AUTHTOKEN
+```
+
+Your static domain is listed at https://dashboard.ngrok.com/domains (free tier gives one).
+
+**5. Redeploy the add-on to your ngrok URL and install it for your account**
+
+From the repo root, update all three URLs in `packages/addon-backend/deployment.json` to your domain, then:
+
+```bash
+gcloud workspace-add-ons deployments replace my-addon \
+  --deployment-file=packages/addon-backend/deployment.json \
+  --project=docalign-prod \
+  --account=YOUR_NAME@docalign.app
+
+gcloud workspace-add-ons deployments install my-addon \
+  --project=docalign-prod \
+  --account=YOUR_NAME@docalign.app
+```
+
+The `install` step makes the add-on visible in the sidebar for your account. You must run it even if you're not changing the URL.
+
+Don't commit your ngrok URL change to `deployment.json` — coordinate with the team first.
+
+---
+
 ## Daily Run
 
 **Terminal 1 — ngrok tunnel**
+
+Replace `YOUR_NGROK_DOMAIN` with your static domain from https://dashboard.ngrok.com/domains:
 ```bash
-ngrok http --url=reactor-explore-crumb.ngrok-free.dev 8080
+ngrok http --url=YOUR_NGROK_DOMAIN 8080
 ```
 
 **Terminal 2 — Go server**
+
+Replace `YOUR_EMAIL` with your `@docalign.app` email and `YOUR_NGROK_DOMAIN` with your domain:
 ```bash
 cd packages/addon-backend
 OIDC_BYPASS=true \
-DEBUG_EMAIL=rraturi@docalign.app \
+DEBUG_EMAIL=YOUR_EMAIL@docalign.app \
 FIREBASE_PROJECT_ID=docalign-prod \
-BASE_URL=https://reactor-explore-crumb.ngrok-free.dev \
+BASE_URL=https://YOUR_NGROK_DOMAIN \
 PORT=8080 \
 go run .
 ```
@@ -152,7 +237,27 @@ go run .
 cd packages/addon-backend && go build ./...
 ```
 
-**Open the add-on:** Go to any Google Doc → click the multicolor "G" icon in the right sidebar.
+**Open the add-on:** Go to any Google Doc on your `@docalign.app` account → click the multicolor "G" icon in the right sidebar.
+
+---
+
+### Redeploying (changing ngrok URL)
+
+If you need to switch to a different ngrok domain, update all three URLs in `packages/addon-backend/deployment.json`, then from the repo root:
+
+```bash
+gcloud workspace-add-ons deployments replace my-addon \
+  --deployment-file=packages/addon-backend/deployment.json \
+  --project=docalign-prod \
+  --account=YOUR_EMAIL@docalign.app
+gcloud workspace-add-ons deployments install my-addon \
+  --project=docalign-prod \
+  --account=YOUR_EMAIL@docalign.app
+```
+
+Don't commit your ngrok URL change to `deployment.json` — coordinate with the team first.
+
+---
 
 ### GCP reference
 
@@ -162,21 +267,8 @@ cd packages/addon-backend && go build ./...
 | GCP org | `docalign.app` (org ID `904470190675`) |
 | Firestore | Native mode, nam5, free tier |
 | OAuth consent | Internal (docalign.app org only, no Google review needed) |
-| Developer account | `rraturi@docalign.app` |
-| ngrok static URL | `https://reactor-explore-crumb.ngrok-free.dev` |
-| Deployment config | `/tmp/addon-deployment.json` |
+| Deployment config | `packages/addon-backend/deployment.json` |
 | Add-on deployment | `my-addon` in `docalign-prod` |
-
-**Redeploy after changing ngrok URL or OAuth scopes:**
-```bash
-gcloud workspace-add-ons deployments replace my-addon \
-  --deployment-file=/tmp/addon-deployment.json \
-  --project=docalign-prod \
-  --account=rraturi@docalign.app
-gcloud workspace-add-ons deployments install my-addon \
-  --project=docalign-prod \
-  --account=rraturi@docalign.app
-```
 
 ---
 

@@ -25,11 +25,9 @@ func Homepage(store *services.Store) http.HandlerFunc {
 		docID := ev.Docs.ID
 		log.Printf("homepage: docs.id=%q title=%q scope=%v user=%s", docID, ev.Docs.Title, ev.Docs.AddonHasFileScopePermission, userEmail)
 		if !ev.Docs.AddonHasFileScopePermission {
-			// drive.file scope not granted for the *current* document.
-			// docs.id may be stale (previous doc) in production, but in test deployments
-			// where drive.file is globally authorized, it IS the current doc — embed it as
-			// a hint so onFileScopeGranted can avoid Drive API fallbacks that pick the wrong doc.
-			writeJSON(w, cards.ConnectDocument(docID))
+			// drive.file scope not yet granted for this doc. Show the normal EmptyState UI
+			// whose "Get started" CTA triggers REQUEST_FILE_SCOPE — no separate gate page.
+			writeJSON(w, cards.EmptyStateRequestScope())
 			return
 		}
 
