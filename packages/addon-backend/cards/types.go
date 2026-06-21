@@ -17,13 +17,33 @@ type ActionNav struct {
 type Navigation struct {
 	PushCard   *Card `json:"pushCard,omitempty"`
 	UpdateCard *Card `json:"updateCard,omitempty"`
+	PopToRoot  bool  `json:"popToRoot,omitempty"`
+}
+
+// PopRoot returns a RenderActions that clears the card stack and re-triggers the homepage.
+func PopRoot() RenderActions {
+	return RenderActions{Action: ActionNav{Navigations: []Navigation{{PopToRoot: true}}}}
 }
 
 // Card is the root card object.
 type Card struct {
-	Name     string    `json:"name"`
-	Header   *Header   `json:"header,omitempty"`
-	Sections []Section `json:"sections"`
+	Name        string       `json:"name"`
+	Header      *Header      `json:"header,omitempty"`
+	CardActions []CardAction `json:"cardActions,omitempty"`
+	Sections    []Section    `json:"sections"`
+}
+
+// CardAction appears in the card's 3-dots overflow menu.
+type CardAction struct {
+	ActionLabel string  `json:"actionLabel"`
+	OnClick     OnClick `json:"onClick"`
+}
+
+func attachDocAction() CardAction {
+	return CardAction{
+		ActionLabel: "Attach document",
+		OnClick:     OnClick{Action: &FormAction{Function: BaseURL + "/addon/attach-document"}},
+	}
 }
 
 type Header struct {
@@ -33,11 +53,10 @@ type Header struct {
 }
 
 type Section struct {
-	Header                    string   `json:"header,omitempty"`
-	HasSeparator              bool     `json:"hasSeparator,omitempty"`
-	Widgets                   []Widget `json:"widgets"`
-	CollapsibleWidgetsCount   int      `json:"collapsibleWidgetsCount,omitempty"`
-	CollapsibleWidgetsExpanded bool    `json:"collapsibleWidgetsExpanded,omitempty"`
+	Header                     string   `json:"header,omitempty"`
+	Widgets                    []Widget `json:"widgets"`
+	CollapsibleWidgetsCount    int      `json:"collapsibleWidgetsCount,omitempty"`
+	CollapsibleWidgetsExpanded bool     `json:"collapsibleWidgetsExpanded,omitempty"`
 }
 
 type Widget struct {
@@ -77,10 +96,11 @@ type ButtonList struct {
 }
 
 type Button struct {
-	Text     string  `json:"text"`
-	OnClick  OnClick `json:"onClick"`
-	Disabled bool    `json:"disabled,omitempty"`
-	Color    *Color  `json:"color,omitempty"`
+	Text     string   `json:"text"`
+	OnClick  *OnClick `json:"onClick,omitempty"`
+	Disabled bool     `json:"disabled,omitempty"`
+	Color    *Color   `json:"color,omitempty"`
+	Type     string   `json:"type,omitempty"` // FILLED | OUTLINED | FILLED_TONAL | BORDERLESS
 }
 
 type Color struct {
@@ -98,7 +118,8 @@ type OnClick struct {
 type FormAction struct {
 	Function    string      `json:"function"`
 	Parameters  []Parameter `json:"parameters,omitempty"`
-	Interaction string      `json:"interaction,omitempty"` // e.g. "REQUEST_FILE_SCOPE"
+	// Interaction 2 = REQUEST_FILE_SCOPE (proto enum value; string form rejected by current runtime).
+	Interaction int         `json:"interaction,omitempty"`
 }
 
 type Parameter struct {
@@ -149,7 +170,7 @@ func actionButton(text, function string, params ...Parameter) Button {
 	}
 	return Button{
 		Text: text,
-		OnClick: OnClick{
+		OnClick: &OnClick{
 			Action: &FormAction{
 				Function:   fn,
 				Parameters: params,
@@ -158,10 +179,22 @@ func actionButton(text, function string, params ...Parameter) Button {
 	}
 }
 
+func filledActionButton(text, function string, params ...Parameter) Button {
+	b := actionButton(text, function, params...)
+	b.Type = "FILLED"
+	return b
+}
+
+func outlinedActionButton(text, function string, params ...Parameter) Button {
+	b := actionButton(text, function, params...)
+	b.Type = "OUTLINED"
+	return b
+}
+
 func linkButton(text, url string) Button {
 	return Button{
 		Text:    text,
-		OnClick: OnClick{OpenLink: &OpenLink{Url: url}},
+		OnClick: &OnClick{OpenLink: &OpenLink{Url: url}},
 	}
 }
 

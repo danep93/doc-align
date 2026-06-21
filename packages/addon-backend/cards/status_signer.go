@@ -4,10 +4,7 @@ import "fmt"
 
 func StatusSigner(docTitle string, signer SignerStatus, diffSummary string, docID string) Card {
 	icon := statusIconWidget(signer.Status)
-	label := signer.DisplayName
-	if label == "" {
-		label = signer.Email
-	}
+	label := "You"
 	bottom := signer.Status
 	if !signer.StatusAt.IsZero() {
 		bottom += " · " + relativeTime(signer.StatusAt)
@@ -19,6 +16,7 @@ func StatusSigner(docTitle string, signer SignerStatus, diffSummary string, docI
 				StartIcon:   icon,
 				Text:        label,
 				BottomLabel: bottom,
+				WrapText:    true,
 			},
 		},
 	}
@@ -32,10 +30,10 @@ func StatusSigner(docTitle string, signer SignerStatus, diffSummary string, docI
 		}
 		widgets = append(widgets, Widget{
 			ButtonList: &ButtonList{Buttons: []Button{
-				actionButton("View changes", "/addon/diff",
+				outlinedActionButton("View version history", "/addon/diff",
 					Parameter{Key: "signerEmail", Value: signer.Email},
 					Parameter{Key: "docId", Value: docID}),
-				actionButton("Sign this doc", "/addon/sign-form",
+				filledActionButton("Re-sign", "/addon/sign-form",
 					Parameter{Key: "docId", Value: docID}),
 			}},
 		})
@@ -43,7 +41,7 @@ func StatusSigner(docTitle string, signer SignerStatus, diffSummary string, docI
 	case "pending":
 		widgets = append(widgets, Widget{
 			ButtonList: &ButtonList{Buttons: []Button{
-				actionButton("Sign this doc", "/addon/sign-form",
+				filledActionButton("Sign this document", "/addon/sign-form",
 					Parameter{Key: "docId", Value: docID}),
 			}},
 		})
@@ -56,13 +54,22 @@ func StatusSigner(docTitle string, signer SignerStatus, diffSummary string, docI
 		widgets = append(widgets, Widget{
 			TextParagraph: &TextParagraph{Text: msg},
 		})
+		widgets = append(widgets, Widget{
+			ButtonList: &ButtonList{Buttons: []Button{
+				outlinedActionButton("View version history", "/addon/diff",
+					Parameter{Key: "signerEmail", Value: signer.Email},
+					Parameter{Key: "docId", Value: docID}),
+			}},
+		})
 	}
 
 	return Card{
 		Name:   "status_signer",
 		Header: &Header{Title: docTitle, Subtitle: "Your sign-off status"},
 		Sections: []Section{
-			{Widgets: widgets},
+			{
+				Widgets:      widgets,
+			},
 		},
 	}
 }

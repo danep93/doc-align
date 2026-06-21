@@ -10,8 +10,9 @@ import (
 // AddonEvent is the JSON body Google sends to every HTTPS add-on endpoint.
 type AddonEvent struct {
 	Docs struct {
-		ID    string `json:"id"`
-		Title string `json:"title"`
+		ID                       string `json:"id"`
+		Title                    string `json:"title"`
+		AddonHasFileScopePermission bool `json:"addonHasFileScopePermission"`
 	} `json:"docs"`
 	Gmail struct {
 		MessageID string `json:"messageId"`

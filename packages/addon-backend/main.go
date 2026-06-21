@@ -45,8 +45,11 @@ func main() {
 	}
 
 	mux.Handle("POST /addon/homepage", protected(routes.Homepage(store)))
+	mux.Handle("POST /addon/attach-document", protected(routes.ShowAttachDocument()))
+	mux.Handle("POST /addon/attach-document-submit", protected(routes.SubmitAttachDocument(store)))
 	mux.Handle("POST /addon/on-file-scope-granted", protected(routes.OnFileScopeGranted(store)))
 	mux.Handle("POST /addon/create-baseline", protected(routes.CreateBaseline(store)))
+	mux.Handle("POST /addon/add-signers", protected(routes.AddSigners(store)))
 	mux.Handle("POST /addon/save-signers", protected(routes.SaveSigners(store)))
 	mux.Handle("POST /addon/sign-form", protected(routes.SignForm()))
 	mux.Handle("POST /addon/sign", protected(routes.Sign(store)))
