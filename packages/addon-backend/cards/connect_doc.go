@@ -1,9 +1,10 @@
 package cards
 
 // ConnectDocument is shown when docs.id is absent on the homepage trigger.
-// The button uses REQUEST_FILE_SCOPE (Interaction=2) so Google requests per-file
-// drive.file access for the currently open document and fires onFileScopeGrantedTrigger
-// with docs.id populated — no doc ID or user input required.
+// The button calls /addon/request-file-scope which returns the
+// requestFileScopeForActiveDocument editor action — the correct mechanism for
+// Editor add-ons (Docs/Sheets/Slides) to trigger Google's per-file consent dialog.
+// After the user grants, onFileScopeGrantedTrigger fires with docs.id populated.
 func ConnectDocument() Card {
 	return Card{
 		Name:   "connect_document",
@@ -17,12 +18,9 @@ func ConnectDocument() Card {
 					WrapText:    true,
 				}},
 				{ButtonList: &ButtonList{Buttons: []Button{{
-					Text: "Connect this document",
-					Type: "FILLED",
-					OnClick: &OnClick{Action: &FormAction{
-						Function:    BaseURL + "/addon/on-file-scope-granted",
-						Interaction: 2, // REQUEST_FILE_SCOPE
-					}},
+					Text:    "Connect this document",
+					Type:    "FILLED",
+					OnClick: &OnClick{Action: &FormAction{Function: BaseURL + "/addon/request-file-scope"}},
 				}}}},
 			},
 		}},

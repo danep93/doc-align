@@ -162,6 +162,27 @@ type SelectionItem struct {
 	Selected bool   `json:"selected,omitempty"`
 }
 
+// editorFileScopeResponse is the response that triggers Google's per-file
+// drive.file scope grant dialog for the active document in Editor add-ons
+// (Docs/Sheets/Slides). This is the HTTP equivalent of
+// CardService.newEditorFileScopeActionResponseBuilder().requestFileScopeForActiveDocument().
+// Do NOT use Interaction=REQUEST_FILE_SCOPE — that is for Drive add-ons only.
+type editorFileScopeResponse struct {
+	RenderActions struct {
+		HostAppAction struct {
+			EditorAction struct {
+				RequestFileScopeForActiveDocument struct{} `json:"requestFileScopeForActiveDocument"`
+			} `json:"editorAction"`
+		} `json:"hostAppAction"`
+	} `json:"renderActions"`
+}
+
+// RequestFileScopeForActiveDocument returns the response that shows Google's
+// per-file consent dialog for the currently open document.
+func RequestFileScopeForActiveDocument() editorFileScopeResponse {
+	return editorFileScopeResponse{}
+}
+
 // Push returns a RenderActions that pushes card onto the navigation stack.
 func Push(card Card) RenderActions {
 	return RenderActions{Action: ActionNav{Navigations: []Navigation{{PushCard: &card}}}}

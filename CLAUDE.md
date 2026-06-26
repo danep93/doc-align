@@ -65,21 +65,25 @@ packages/addon-backend/
   "https://www.googleapis.com/auth/documents.readonly",
   "https://www.googleapis.com/auth/drive.file",
   "https://www.googleapis.com/auth/drive.readonly",
-  "https://www.googleapis.com/auth/userinfo.email",
-  "https://www.googleapis.com/auth/gmail.addons.current.message.metadata"
+  "https://www.googleapis.com/auth/userinfo.email"
 ]
 ```
 
 `documents.readonly` is sensitive (requires Google verification). Evaluate early: if `drive.file` alone supports `files.export` for add-on-opened files, drop `documents.readonly` entirely.
 
+Gmail contextual trigger was removed — the `gmail.addons.current.message.metadata` scope added unnecessary permission friction for a feature that wasn't built. Sign-off notifications use email-with-doc-link instead.
+
 ### Firestore schema
 
 ```
+config/secrets
+  resendApiKey — Resend API key (read by server at startup; env var RESEND_API_KEY overrides)
+
 documents/{docId}
   title, ownerId, ownerRefreshToken (encrypted KMS), baselineRevisionId, lastDriftCheckedAt, createdAt
 
 documents/{docId}/signers/{email}
-  status (pending | signed | drifted), signedAt, signedRevisionId, commitMessage
+  status (pending | signed | drifted), signedAt, signedRevisionId, commitMessage, notifiedAt
 
 documents/{docId}/history/{id}
   action, actorEmail, commitMessage, revisionId, timestamp
@@ -121,13 +125,25 @@ Document content is **never stored**. Only revision IDs and metadata.
 - **Owner token / OAuth callback** — `ownerRefreshToken` is never written; need an OAuth callback endpoint; manual Firestore write for testing in the meantime
 - **Diff view** — blocked on `ownerRefreshToken` in Firestore
 - **`docs.id` flow** — should work correctly on the Workspace account (`rraturi@docalign.app`) since `drive.file` is not globally pre-authorized. Per-file dialog appears on first open of each doc.
-- **Email notifications** — SendGrid/Resend integration not built
+- **Email notifications** — ✅ Sign-off request email sent via Resend on `save-signers`; key stored in Firestore `config/secrets`
 - **History card** — not tested
 - **Multi-user flows** — owner + signer in separate accounts
 
 ---
 
 ## Getting Started (new team member)
+
+### How add-on deployment works
+
+Two separate concepts — understand these before running any commands:
+
+- **Deployment** (`my-addon` in `docalign-prod`): The add-on definition — HTTP endpoints, OAuth scopes, trigger config. There is **one** deployment shared by the whole org. It points to one server URL at a time. Only the project owner needs to update this when the server URL or config changes (`deployments replace`).
+
+- **Install**: Tells Google to show the add-on in a specific user's Docs sidebar. Each team member installs it **once** for their own account (`deployments install`). **You cannot install it for someone else** — each person runs the command authenticated as their own account. Installing does not create a new add-on; everyone shares the same deployment and the same Go server.
+
+> During local dev, whoever last ran `deployments replace` controls where Google routes requests. Coordinate with the team — only one person's ngrok server can be active at a time.
+
+---
 
 ### Prerequisites
 
@@ -187,55 +203,63 @@ ngrok config add-authtoken YOUR_AUTHTOKEN
 
 Your static domain is listed at https://dashboard.ngrok.com/domains (free tier gives one).
 
-**5. Redeploy the add-on to your ngrok URL and install it for your account**
+**5a. Install the add-on for your account (every team member, once)**
 
-From the repo root, update all three URLs in `packages/addon-backend/deployment.json` to your domain, then:
+This makes the add-on appear in your Google Docs sidebar. You cannot do this for another person — each team member runs it themselves, authenticated as their own account.
+
+```bash
+gcloud workspace-add-ons deployments install my-addon \
+  --project=docalign-prod \
+  --account=YOUR_NAME@docalign.app
+```
+
+**5b. Point the deployment at your local server (only if you are running the server)**
+
+If you want to develop locally and have Google route requests to your own ngrok tunnel, set `NGROK_URL` in `packages/addon-backend/.env`, update all three URLs in `packages/addon-backend/deployment.json` to `https://$NGROK_URL`, then:
 
 ```bash
 gcloud workspace-add-ons deployments replace my-addon \
   --deployment-file=packages/addon-backend/deployment.json \
   --project=docalign-prod \
   --account=YOUR_NAME@docalign.app
-
-gcloud workspace-add-ons deployments install my-addon \
-  --project=docalign-prod \
-  --account=YOUR_NAME@docalign.app
 ```
 
-The `install` step makes the add-on visible in the sidebar for your account. You must run it even if you're not changing the URL.
-
-Don't commit your ngrok URL change to `deployment.json` — coordinate with the team first.
+This overwrites the shared deployment for everyone — coordinate with the team first. Don't commit your ngrok URL change to `deployment.json`.
 
 ---
 
 ## Daily Run
 
+**Before first run:** copy `packages/addon-backend/.env.example` to `packages/addon-backend/.env` and fill in your values — especially `NGROK_URL` (your static domain from https://dashboard.ngrok.com/domains) and `DEBUG_EMAIL` (your `@docalign.app` email). The server auto-loads `.env` on startup.
+
 **Terminal 1 — ngrok tunnel**
 
-Replace `YOUR_NGROK_DOMAIN` with your static domain from https://dashboard.ngrok.com/domains:
 ```bash
-ngrok http --url=YOUR_NGROK_DOMAIN 8080
+source packages/addon-backend/.env && ngrok http --url=$NGROK_URL 8080
 ```
 
 **Terminal 2 — Go server**
 
-Replace `YOUR_EMAIL` with your `@docalign.app` email and `YOUR_NGROK_DOMAIN` with your domain:
 ```bash
-cd packages/addon-backend
-OIDC_BYPASS=true \
-DEBUG_EMAIL=YOUR_EMAIL@docalign.app \
-FIREBASE_PROJECT_ID=docalign-prod \
-BASE_URL=https://YOUR_NGROK_DOMAIN \
-PORT=8080 \
-go run .
+cd packages/addon-backend && go run .
 ```
 
-`OIDC_BYPASS=true` skips OIDC JWT verification (required behind ngrok). `BASE_URL` is required — all Card Service action buttons embed it.
+`OIDC_BYPASS=true` skips OIDC JWT verification (required behind ngrok). `BASE_URL` is required — all Card Service action buttons embed it. Both are set in `.env`.
+
+The server reads `RESEND_API_KEY` from `.env`; it also falls back to Firestore `config/secrets` if not set.
 
 **Build without running:**
 ```bash
 cd packages/addon-backend && go build ./...
 ```
+
+**Verify the stack is up** (run in a third terminal after both ngrok and the server are running):
+
+```bash
+source packages/addon-backend/.env && curl -s https://$NGROK_URL/healthz
+```
+
+Should return `200 OK`. If it hangs or errors, check that ngrok is running and the tunnel URL in `.env` matches your ngrok domain.
 
 **Open the add-on:** Go to any Google Doc on your `@docalign.app` account → click the multicolor "G" icon in the right sidebar.
 
@@ -250,12 +274,9 @@ gcloud workspace-add-ons deployments replace my-addon \
   --deployment-file=packages/addon-backend/deployment.json \
   --project=docalign-prod \
   --account=YOUR_EMAIL@docalign.app
-gcloud workspace-add-ons deployments install my-addon \
-  --project=docalign-prod \
-  --account=YOUR_EMAIL@docalign.app
 ```
 
-Don't commit your ngrok URL change to `deployment.json` — coordinate with the team first.
+Don't commit your ngrok URL change to `deployment.json` — coordinate with the team first. (`deployments install` is one-time per user and does not need to be re-run when the URL changes.)
 
 ---
 
