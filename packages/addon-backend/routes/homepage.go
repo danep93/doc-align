@@ -23,26 +23,12 @@ func Homepage(store *services.Store) http.HandlerFunc {
 		}
 
 		docID := ev.Docs.ID
-		log.Printf("homepage: docs.id=%q title=%q scope=%v authorizedScopes=%v user=%s",
-			docID, ev.Docs.Title, ev.Docs.AddonHasFileScopePermission,
-			ev.AuthorizationEventObject.AuthorizedScopes, userEmail)
+		log.Printf("homepage: docs.id=%q title=%q user=%s", docID, ev.Docs.Title, userEmail)
 
 		if docID == "" {
-			// docs.id is absent (drive.file is globally pre-authorized, skipping per-file grant).
-			// Fall back to Drive API: the most-recently-viewed Doc is the one currently open.
-			userToken := ev.AuthorizationEventObject.UserOAuthToken
-			if userToken != "" {
-				if id, err := services.MostRecentDocID(ctx, userToken); err == nil {
-					log.Printf("homepage: auto-detected docID=%q via drive.readonly", id)
-					docID = id
-				} else {
-					log.Printf("homepage: MostRecentDocID failed: %v", err)
-				}
-			}
-			if docID == "" {
-				writeErr(w, "Could not detect the current document. Please close and reopen the sidebar.")
-				return
-			}
+			log.Printf("homepage: docs.id missing — drive.file not yet granted, showing connect card")
+			writeJSON(w, cards.ConnectDocument())
+			return
 		}
 
 		doc, err := store.GetDoc(ctx, docID)

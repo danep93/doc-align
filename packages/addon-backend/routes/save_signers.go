@@ -11,7 +11,7 @@ import (
 	"github.com/doc-align/addon-backend/services"
 )
 
-func SaveSigners(store *services.Store) http.HandlerFunc {
+func SaveSigners(store *services.Store, resendKey string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		userEmail := middleware.EmailFromContext(ctx)
@@ -57,6 +57,13 @@ func SaveSigners(store *services.Store) http.HandlerFunc {
 			ActorEmail: userEmail,
 			Timestamp:  time.Now(),
 		})
+
+		// Send sign-off request emails; non-fatal if Resend is unavailable.
+		go func() {
+			if err := services.SendSignoffRequest(resendKey, userEmail, doc.Title, docID, selectedEmails); err != nil {
+				log.Printf("save-signers: send signoff email: %v", err)
+			}
+		}()
 
 		// Return owner status card.
 		signerMap, _ := store.ListSigners(ctx, docID)
