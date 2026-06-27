@@ -58,14 +58,14 @@ func Homepage(store *services.Store) http.HandlerFunc {
 		}
 
 		// Signer view
-		signerRec, exists := signerMap[userEmail]
-		if !exists {
+		if _, exists := signerMap[userEmail]; !exists {
 			writeJSON(w, cards.EmptyState(false, docID))
 			return
 		}
 
-		ss := recordToStatus(userEmail, signerRec)
-		writeJSON(w, cards.StatusSigner(doc.Title, ss, "", docID))
+		ownerName := services.DisplayName(doc.OwnerID)
+		allSigners := toSignerStatusList(signerMap)
+		writeJSON(w, cards.StatusSigner(doc.Title, ownerName, allSigners, userEmail, docID))
 	}
 }
 

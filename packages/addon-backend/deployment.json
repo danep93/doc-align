@@ -12,15 +12,15 @@
       "name": "doc-align",
       "logoUrl": "https://www.gstatic.com/images/branding/product/1x/googleg_48dp.png",
       "homepageTrigger": {
-        "runFunction": "https://reactor-explore-crumb.ngrok-free.dev/addon/homepage"
+        "runFunction": "https://doc-align-addon-856331950906.us-central1.run.app/addon/homepage"
       }
     },
     "docs": {
       "homepageTrigger": {
-        "runFunction": "https://reactor-explore-crumb.ngrok-free.dev/addon/homepage"
+        "runFunction": "https://doc-align-addon-856331950906.us-central1.run.app/addon/homepage"
       },
       "onFileScopeGrantedTrigger": {
-        "runFunction": "https://reactor-explore-crumb.ngrok-free.dev/addon/on-file-scope-granted"
+        "runFunction": "https://doc-align-addon-856331950906.us-central1.run.app/addon/on-file-scope-granted"
       }
     }
   }

@@ -10,7 +10,7 @@ import (
 	"github.com/doc-align/addon-backend/services"
 )
 
-func QuickSign(store *services.Store) http.HandlerFunc {
+func QuickSign(store *services.Store, resendKey string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		userEmail := middleware.EmailFromContext(ctx)
@@ -49,10 +49,21 @@ func QuickSign(store *services.Store) http.HandlerFunc {
 			Timestamp:     now,
 		})
 
-		doc, _ := store.GetDoc(ctx, docID)
+		doc, err := store.GetDoc(ctx, docID)
+		if err != nil {
+			writeActionErr(w, "Something went wrong. Please try again.")
+			return
+		}
+
+		go func() {
+			if err := services.SendSignedNotification(resendKey, doc.OwnerID, userEmail, doc.Title, docID); err != nil {
+				log.Printf("quick-sign: SendSignedNotification: %v", err)
+			}
+		}()
+
 		signerMap, _ := store.ListSigners(ctx, docID)
-		rec := signerMap[userEmail]
-		ss := recordToStatus(userEmail, rec)
-		writeJSON(w, cards.Push(cards.StatusSigner(doc.Title, ss, "", docID)))
+		ownerName := services.DisplayName(doc.OwnerID)
+		allSigners := toSignerStatusList(signerMap)
+		writeJSON(w, cards.Push(cards.StatusSigner(doc.Title, ownerName, allSigners, userEmail, docID)))
 	}
 }
