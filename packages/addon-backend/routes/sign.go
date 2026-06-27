@@ -10,7 +10,7 @@ import (
 	"github.com/doc-align/addon-backend/services"
 )
 
-func Sign(store *services.Store) http.HandlerFunc {
+func Sign(store *services.Store, resendKey string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		userEmail := middleware.EmailFromContext(ctx)
@@ -55,9 +55,15 @@ func Sign(store *services.Store) http.HandlerFunc {
 			return
 		}
 
+		go func() {
+			if err := services.SendSignedNotification(resendKey, doc.OwnerID, userEmail, doc.Title, docID); err != nil {
+				log.Printf("sign: SendSignedNotification: %v", err)
+			}
+		}()
+
 		signerMap, _ := store.ListSigners(ctx, docID)
-		rec := signerMap[userEmail]
-		ss := recordToStatus(userEmail, rec)
-		writeJSON(w, cards.Push(cards.StatusSigner(doc.Title, ss, "", docID)))
+		ownerName := services.DisplayName(doc.OwnerID)
+		allSigners := toSignerStatusList(signerMap)
+		writeJSON(w, cards.Push(cards.StatusSigner(doc.Title, ownerName, allSigners, userEmail, docID)))
 	}
 }

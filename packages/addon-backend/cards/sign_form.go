@@ -1,6 +1,8 @@
 package cards
 
-func SignForm(userEmail string, suggestedCommitMessage string, docID string) Card {
+import "fmt"
+
+func SignForm(docTitle, ownerName string, docID string) Card {
 	widgets := []Widget{
 		{TextParagraph: &TextParagraph{Text: "Quick sign:"}},
 		{
@@ -13,10 +15,9 @@ func SignForm(userEmail string, suggestedCommitMessage string, docID string) Car
 		},
 		{
 			TextInput: &TextInput{
-				Name:      "commitMessage",
-				Label:     "Sign-off note (optional)",
-				Multiline: true,
-				Value:     suggestedCommitMessage,
+				Name:  "commitMessage",
+				Label: "Sign-off note (optional)",
+				Type:  "MULTIPLE_LINE",
 			},
 		},
 		{
@@ -29,7 +30,7 @@ func SignForm(userEmail string, suggestedCommitMessage string, docID string) Car
 
 	return Card{
 		Name:   "sign_form",
-		Header: &Header{Title: "Sign off"},
+		Header: &Header{Title: docTitle, Subtitle: fmt.Sprintf("Sign-off requested by %s", ownerName)},
 		Sections: []Section{
 			{Widgets: widgets},
 		},

@@ -63,6 +63,19 @@ func StatusOwner(docTitle string, signers []SignerStatus, docID string) Card {
 				Text:        label,
 				BottomLabel: bottom,
 				WrapText:    true,
+				Button: &Button{
+					Icon: &Icon{MaterialIcon: &MaterialIcon{Name: "person_remove"}, AltText: "Remove signer"},
+					Type: "BORDERLESS",
+					OnClick: &OnClick{
+						Action: &FormAction{
+							Function: BaseURL + "/addon/remove-signer",
+							Parameters: []Parameter{
+								{Key: "signerEmail", Value: s.Email},
+								{Key: "docId", Value: docID},
+							},
+						},
+					},
+				},
 			},
 		}
 		signerWidgets = append(signerWidgets, w)

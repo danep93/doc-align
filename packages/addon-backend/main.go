@@ -66,9 +66,10 @@ func main() {
 	mux.Handle("POST /addon/create-baseline", protected(routes.CreateBaseline(store)))
 	mux.Handle("POST /addon/add-signers", protected(routes.AddSigners(store)))
 	mux.Handle("POST /addon/save-signers", protected(routes.SaveSigners(store, resendKey)))
-	mux.Handle("POST /addon/sign-form", protected(routes.SignForm()))
-	mux.Handle("POST /addon/sign", protected(routes.Sign(store)))
-	mux.Handle("POST /addon/quick-sign", protected(routes.QuickSign(store)))
+	mux.Handle("POST /addon/sign-form", protected(routes.SignForm(store)))
+	mux.Handle("POST /addon/sign", protected(routes.Sign(store, resendKey)))
+	mux.Handle("POST /addon/quick-sign", protected(routes.QuickSign(store, resendKey)))
+	mux.Handle("POST /addon/remove-signer", protected(routes.RemoveSigner(store)))
 	mux.Handle("POST /addon/diff", protected(routes.Diff(store)))
 	mux.Handle("POST /addon/history", protected(routes.History(store)))
 

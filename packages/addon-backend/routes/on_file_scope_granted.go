@@ -62,13 +62,13 @@ func OnFileScopeGranted(store *services.Store) http.HandlerFunc {
 			return
 		}
 
-		signerRec, exists := signerMap[userEmail]
-		if !exists {
+		if _, exists := signerMap[userEmail]; !exists {
 			writeJSON(w, cards.Push(cards.EmptyState(false, docID)))
 			return
 		}
 
-		ss := recordToStatus(userEmail, signerRec)
-		writeJSON(w, cards.Push(cards.StatusSigner(doc.Title, ss, "", docID)))
+		ownerName := services.DisplayName(doc.OwnerID)
+		allSigners := toSignerStatusList(signerMap)
+		writeJSON(w, cards.Push(cards.StatusSigner(doc.Title, ownerName, allSigners, userEmail, docID)))
 	}
 }

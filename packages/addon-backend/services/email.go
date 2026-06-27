@@ -14,7 +14,7 @@ func SendSignoffRequest(apiKey, ownerEmail, docTitle, docID string, signerEmails
 		return fmt.Errorf("RESEND_API_KEY not set")
 	}
 
-	ownerName := displayName(ownerEmail)
+	ownerName := DisplayName(ownerEmail)
 	docURL := "https://docs.google.com/document/d/" + docID + "/edit"
 
 	subject := fmt.Sprintf("%s requested your sign-off on %q", ownerName, docTitle)
@@ -90,9 +90,43 @@ func resendSend(apiKey, to, subject, text, html string) error {
 	return nil
 }
 
-// displayName extracts a capitalized first name from an email address.
+func SendSignedNotification(apiKey, ownerEmail, signerEmail, docTitle, docID string) error {
+	if apiKey == "" {
+		return fmt.Errorf("RESEND_API_KEY not set")
+	}
+
+	signerName := DisplayName(signerEmail)
+	docURL := "https://docs.google.com/document/d/" + docID + "/edit"
+
+	subject := fmt.Sprintf("%s signed off on %q", signerName, docTitle)
+
+	plainText := fmt.Sprintf(
+		"%s has signed off on \"%s\".\n\nView the document to check the latest sign-off status:\n%s",
+		signerName, docTitle, docURL,
+	)
+
+	htmlBody := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<body style="font-family:sans-serif;max-width:560px;margin:40px auto;color:#1f2328">
+  <p><strong>%s</strong> has signed off on:</p>
+  <p style="font-size:18px;font-weight:600">%s</p>
+  <p>
+    <a href="%s"
+       style="display:inline-block;padding:10px 20px;background:#1a73e8;color:#fff;text-decoration:none;border-radius:4px;font-weight:600">
+      View document
+    </a>
+  </p>
+  <hr style="margin-top:40px;border:none;border-top:1px solid #e1e4e8">
+  <p style="color:#6e7781;font-size:12px">Sent by DocAlign.</p>
+</body>
+</html>`, signerName, docTitle, docURL)
+
+	return resendSend(apiKey, ownerEmail, subject, plainText, htmlBody)
+}
+
+// DisplayName extracts a capitalized first name from an email address.
 // "rahul@docalign.app" → "Rahul"
-func displayName(email string) string {
+func DisplayName(email string) string {
 	local := strings.SplitN(email, "@", 2)[0]
 	local = strings.ReplaceAll(local, ".", " ")
 	local = strings.ReplaceAll(local, "_", " ")

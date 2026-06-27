@@ -105,7 +105,8 @@ type ButtonList struct {
 }
 
 type Button struct {
-	Text     string   `json:"text"`
+	Text     string   `json:"text,omitempty"`
+	Icon     *Icon    `json:"icon,omitempty"`
 	OnClick  *OnClick `json:"onClick,omitempty"`
 	Disabled bool     `json:"disabled,omitempty"`
 	Color    *Color   `json:"color,omitempty"`
@@ -141,11 +142,11 @@ type OpenLink struct {
 }
 
 type TextInput struct {
-	Name        string `json:"name"`
-	Label       string `json:"label"`
-	HintText    string `json:"hintText,omitempty"`
-	Value       string `json:"value,omitempty"`
-	Multiline   bool   `json:"multiline,omitempty"`
+	Name     string `json:"name"`
+	Label    string `json:"label"`
+	HintText string `json:"hintText,omitempty"`
+	Value    string `json:"value,omitempty"`
+	Type     string `json:"type,omitempty"` // SINGLE_LINE | MULTIPLE_LINE
 }
 
 type SelectionInput struct {
