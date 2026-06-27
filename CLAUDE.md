@@ -75,7 +75,7 @@ Gmail contextual trigger was removed — the `gmail.addons.current.message.metad
 
 ```
 config/secrets
-  resendApiKey — Resend API key (read from Firestore at startup; no env var override)
+  resendApiKey — Resend API key (read by server at startup; env var RESEND_API_KEY overrides)
 
 documents/{docId}
   title, ownerId, ownerRefreshToken (encrypted KMS), baselineRevisionId, lastDriftCheckedAt, createdAt
@@ -260,7 +260,7 @@ gcloud workspace-add-ons deployments replace my-addon \
 
 Only needed when you want to test changes before deploying to Cloud Run.
 
-**Before first run:** copy `packages/addon-backend/.env.example` to `packages/addon-backend/.env` and fill in `NGROK_URL`. The Go server no longer reads `.env` directly — env vars must be set in your shell before running.
+**Before first run:** copy `packages/addon-backend/.env.example` to `packages/addon-backend/.env` and fill in your values — especially `NGROK_URL` (your static domain from https://dashboard.ngrok.com/domains) and `DEBUG_EMAIL` (your `@docalign.app` email). The server auto-loads `.env` on startup.
 
 **Terminal 1 — ngrok tunnel**
 
@@ -274,12 +274,20 @@ source packages/addon-backend/.env && ngrok http --url=$NGROK_URL 8080
 source packages/addon-backend/.env && go run ./packages/addon-backend/
 ```
 
-`OIDC_BYPASS=true` skips OIDC JWT verification (required behind ngrok). `BASE_URL` must match your ngrok URL. Both are set via `source .env`. Secrets (Resend API key) are read from Firestore at startup — no local secret files needed.
+`OIDC_BYPASS=true` skips OIDC JWT verification (required behind ngrok). `BASE_URL` must match your ngrok URL. Both are set via `source .env`. The server reads `RESEND_API_KEY` from `.env` and falls back to Firestore `config/secrets` if not set.
 
 **Build without running:**
 ```bash
 cd packages/addon-backend && go build ./...
 ```
+
+**Verify the stack is up** (run in a third terminal after both ngrok and the server are running):
+
+```bash
+source packages/addon-backend/.env && curl -s https://$NGROK_URL/healthz
+```
+
+Should return `200 OK`. If it hangs or errors, check that ngrok is running and the tunnel URL in `.env` matches your ngrok domain.
 
 **Open the add-on:** Go to any Google Doc on your `@docalign.app` account → click the multicolor "G" icon in the right sidebar.
 

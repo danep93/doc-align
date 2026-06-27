@@ -17,10 +17,10 @@ func SendSignoffRequest(apiKey, ownerEmail, docTitle, docID string, signerEmails
 	ownerName := DisplayName(ownerEmail)
 	docURL := "https://docs.google.com/document/d/" + docID + "/edit"
 
-	subject := fmt.Sprintf("%s is requesting your sign-off on %q", ownerName, docTitle)
+	subject := fmt.Sprintf("%s requested your sign-off on %q", ownerName, docTitle)
 
 	plainText := fmt.Sprintf(
-		"%s has asked you to review and sign off on \"%s\".\n\nOpen the document, read through it, and sign off from the DocAlign sidebar when you're ready.\n\n%s\n\n──\nSent by DocAlign on behalf of %s.",
+		"%s has asked you to review and sign off on:\n\n  %s\n\nOpen the document to review it. Sign off from the sidebar when ready:\n%s\n\n──\nSent by DocAlign on behalf of %s.\nYou received this because you were added as a signer on this document.",
 		ownerName, docTitle, docURL, ownerEmail,
 	)
 
@@ -29,7 +29,7 @@ func SendSignoffRequest(apiKey, ownerEmail, docTitle, docID string, signerEmails
 <body style="font-family:sans-serif;max-width:560px;margin:40px auto;color:#1f2328">
   <p><strong>%s</strong> has asked you to review and sign off on:</p>
   <p style="font-size:18px;font-weight:600">%s</p>
-  <p>Open the document, read through it, and sign off from the DocAlign sidebar when you're ready.</p>
+  <p>Open the document to review it. Sign off from the sidebar when ready.</p>
   <p>
     <a href="%s"
        style="display:inline-block;padding:10px 20px;background:#1a73e8;color:#fff;text-decoration:none;border-radius:4px;font-weight:600">
@@ -38,7 +38,8 @@ func SendSignoffRequest(apiKey, ownerEmail, docTitle, docID string, signerEmails
   </p>
   <hr style="margin-top:40px;border:none;border-top:1px solid #e1e4e8">
   <p style="color:#6e7781;font-size:12px">
-    Sent by DocAlign on behalf of %s.
+    Sent by DocAlign on behalf of %s.<br>
+    You received this because you were added as a signer on this document.
   </p>
 </body>
 </html>`, ownerName, docTitle, docURL, ownerEmail)
