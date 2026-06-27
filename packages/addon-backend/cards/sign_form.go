@@ -15,9 +15,9 @@ func SignForm(docTitle, ownerName string, docID string) Card {
 		},
 		{
 			TextInput: &TextInput{
-				Name:      "commitMessage",
-				Label:     "Sign-off note (optional)",
-				Multiline: true,
+				Name:  "commitMessage",
+				Label: "Sign-off note (optional)",
+				Type:  "MULTIPLE_LINE",
 			},
 		},
 		{

@@ -173,13 +173,7 @@ Not installed? Follow https://cloud.google.com/sdk/docs/install
 
 ### One-time setup
 
-**1. Get access to the GCP project**
-
-Ask Rahul to:
-- Create a `@docalign.app` Workspace account for you (OAuth consent is Internal — only org members can use the add-on)
-- Add you to `docalign-prod` in GCP with at least the `Cloud Datastore User` role (for Firestore) and `Workspace Add-ons Developer` role
-
-**2. Authenticate gcloud**
+**1. Authenticate gcloud**
 
 Run all commands below from the **repo root** unless otherwise noted.
 
@@ -189,13 +183,13 @@ gcloud config set account YOUR_NAME@docalign.app
 gcloud config set project docalign-prod
 ```
 
-**3. Set up Application Default Credentials (needed for Firestore)**
+**2. Set up Application Default Credentials (needed for Firestore)**
 ```bash
 gcloud auth application-default login
 ```
 A browser window opens — sign in with your `@docalign.app` account.
 
-**4. Configure ngrok authtoken**
+**3. Configure ngrok authtoken**
 
 Log in to https://dashboard.ngrok.com, copy your authtoken from the "Your Authtoken" page, then:
 ```bash
@@ -204,7 +198,7 @@ ngrok config add-authtoken YOUR_AUTHTOKEN
 
 Your static domain is listed at https://dashboard.ngrok.com/domains (free tier gives one).
 
-**5a. Install the add-on for your account (every team member, once)**
+**4a. Install the add-on for your account (every team member, once)**
 
 This makes the add-on appear in your Google Docs sidebar. You cannot do this for another person — each team member runs it themselves, authenticated as their own account.
 
@@ -214,7 +208,7 @@ gcloud workspace-add-ons deployments install my-addon \
   --account=YOUR_NAME@docalign.app
 ```
 
-**5b. (Local dev only) Point the deployment at your ngrok tunnel**
+**4b. (Local dev only) Point the deployment at your ngrok tunnel**
 
 If you want to develop locally and have Google route requests to your ngrok tunnel, update all three URLs in `packages/addon-backend/deployment.json` to your ngrok URL, then:
 
@@ -237,7 +231,7 @@ The add-on backend runs on Cloud Run at a permanent URL — no ngrok required fo
 
 ### Deploying a new version
 
-From the repo root, authenticated as `rraturi@docalign.app`:
+From the repo root, authenticated as your `@docalign.app` account (needs `Cloud Run Developer` role in `docalign-prod`):
 
 ```bash
 gcloud run deploy doc-align-addon \

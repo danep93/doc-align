@@ -52,13 +52,16 @@ func Homepage(store *services.Store) http.HandlerFunc {
 		}
 
 		if isOwner {
+			log.Printf("homepage: showing StatusOwner to %s for doc %s", userEmail, docID)
 			signerStatuses := toSignerStatusList(signerMap)
 			writeJSON(w, cards.StatusOwner(doc.Title, signerStatuses, docID))
 			return
 		}
 
 		// Signer view
-		if _, exists := signerMap[userEmail]; !exists {
+		_, isSigner := signerMap[userEmail]
+		log.Printf("homepage: user=%s docOwner=%s isSigner=%v signerMapKeys=%v", userEmail, doc.OwnerID, isSigner, signerMapKeys(signerMap))
+		if !isSigner {
 			writeJSON(w, cards.EmptyState(false, docID))
 			return
 		}
@@ -79,6 +82,14 @@ func toSignerStatusList(m map[string]services.SignerRecord) []cards.SignerStatus
 		result = append(result, recordToStatus(email, rec))
 	}
 	return result
+}
+
+func signerMapKeys(m map[string]services.SignerRecord) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 func recordToStatus(email string, rec services.SignerRecord) cards.SignerStatus {

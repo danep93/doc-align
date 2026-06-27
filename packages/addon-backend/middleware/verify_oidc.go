@@ -1,9 +1,11 @@
 package middleware
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -41,12 +43,34 @@ func VerifyOIDC(next http.Handler) http.Handler {
 		}
 		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 
-		email, err := verifyGoogleJWT(r.Context(), tokenStr)
-		if err != nil {
+		if _, err := verifyGoogleJWT(r.Context(), tokenStr); err != nil {
 			http.Error(w, fmt.Sprintf("invalid OIDC token: %v", err), http.StatusUnauthorized)
 			return
 		}
 
+		// The OIDC token above authenticates the request as coming from Google's
+		// add-on infrastructure (service account), not the end user. Extract the
+		// actual user email from the OAuth token embedded in the event payload.
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "failed to read body", http.StatusInternalServerError)
+			return
+		}
+
+		var evPartial struct {
+			Auth struct {
+				UserOAuthToken string `json:"userOAuthToken"`
+			} `json:"authorizationEventObject"`
+		}
+		json.Unmarshal(body, &evPartial)
+
+		email, err := fetchEmailFromOAuthToken(r.Context(), evPartial.Auth.UserOAuthToken)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("could not identify user: %v", err), http.StatusUnauthorized)
+			return
+		}
+
+		r.Body = io.NopCloser(bytes.NewReader(body))
 		ctx := context.WithValue(r.Context(), UserEmailKey, email)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -56,6 +80,32 @@ func VerifyOIDC(next http.Handler) http.Handler {
 func EmailFromContext(ctx context.Context) string {
 	v, _ := ctx.Value(UserEmailKey).(string)
 	return v
+}
+
+func fetchEmailFromOAuthToken(ctx context.Context, token string) (string, error) {
+	if token == "" {
+		return "", fmt.Errorf("empty OAuth token in event payload")
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://www.googleapis.com/oauth2/v3/userinfo", nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	var info struct {
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		return "", err
+	}
+	if info.Email == "" {
+		return "", fmt.Errorf("no email in userinfo response")
+	}
+	return info.Email, nil
 }
 
 // jwks caches Google's public keys. A real implementation would refresh on 403.

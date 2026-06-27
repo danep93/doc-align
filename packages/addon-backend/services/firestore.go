@@ -110,6 +110,11 @@ func (s *Store) SetSigner(ctx context.Context, docID, email string, rec SignerRe
 	return err
 }
 
+func (s *Store) DeleteSigner(ctx context.Context, docID, email string) error {
+	_, err := s.client.Collection("documents").Doc(docID).Collection("signers").Doc(email).Delete(ctx)
+	return err
+}
+
 func (s *Store) UpdateSignerStatus(ctx context.Context, docID, email, status string, updates map[string]interface{}) error {
 	up := []firestore.Update{{Path: "status", Value: status}}
 	for k, v := range updates {
