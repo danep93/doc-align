@@ -11,11 +11,9 @@ import (
 	"github.com/doc-align/addon-backend/middleware"
 	"github.com/doc-align/addon-backend/routes"
 	"github.com/doc-align/addon-backend/services"
-	"github.com/joho/godotenv"
 )
 
 func main() {
-	_ = godotenv.Load() // load .env if present; env vars already set take precedence
 	ctx := context.Background()
 
 	cards.BaseURL = os.Getenv("BASE_URL")
@@ -37,18 +35,15 @@ func main() {
 	}
 	defer fsClient.Close()
 
-	// RESEND_API_KEY: env var takes precedence; fall back to Firestore config/secrets.
-	resendKey := os.Getenv("RESEND_API_KEY")
-	if resendKey == "" {
-		snap, err := fsClient.Collection("config").Doc("secrets").Get(ctx)
-		if err == nil {
-			if v, ok := snap.Data()["resendApiKey"].(string); ok {
-				resendKey = v
-			}
+	// RESEND_API_KEY lives in Firestore config/secrets.resendApiKey.
+	var resendKey string
+	if snap, err := fsClient.Collection("config").Doc("secrets").Get(ctx); err == nil {
+		if v, ok := snap.Data()["resendApiKey"].(string); ok {
+			resendKey = v
 		}
 	}
 	if resendKey == "" {
-		log.Println("RESEND_API_KEY not found in env or Firestore config — sign-off emails will not be sent")
+		log.Println("resendApiKey not found in Firestore config/secrets — emails will not be sent")
 	}
 
 	store := services.NewStore(fsClient)
