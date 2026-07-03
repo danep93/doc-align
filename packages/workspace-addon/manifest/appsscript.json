@@ -5,7 +5,7 @@
   "addOns": {
     "common": {
       "name": "doc-align",
-      "logoUrl": "https://www.gstatic.com/images/branding/product/1x/googleg_48dp.png",
+      "logoUrl": "https://doc-align-addon-856331950906.us-central1.run.app/static/icon.png",
       "homepageTrigger": {
         "runFunction": "onHomepage",
         "enabled": true

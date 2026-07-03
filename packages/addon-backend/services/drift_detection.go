@@ -42,7 +42,7 @@ func DetectDrift(currentText, signedText string) DriftResult {
 		if sim < driftThreshold {
 			drifted = true
 		}
-		a, r, lines := lineDiff(signed, current)
+		a, r := lineDiff(signed, current)
 		added += a
 		removed += r
 		if a > 0 || r > 0 {
@@ -50,7 +50,6 @@ func DetectDrift(currentText, signedText string) DriftResult {
 				Title:   title,
 				Added:   a,
 				Removed: r,
-				Lines:   lines,
 			})
 		}
 	}
@@ -146,23 +145,13 @@ func lineCount(text string) int {
 	return n
 }
 
-// lineDiff runs an LCS diff between two texts and returns added/removed counts + annotated lines.
-func lineDiff(oldText, newText string) (added, removed int, lines []cards.DiffLine) {
+// lineDiff runs an LCS diff between two texts and returns added/removed line counts.
+func lineDiff(oldText, newText string) (added, removed int) {
 	a := nonEmptyLines(oldText)
 	b := nonEmptyLines(newText)
 
 	table := lcsTable(a, b)
-	lines = backtrack(a, b, table, len(a), len(b))
-
-	for _, l := range lines {
-		switch l.Type {
-		case "added":
-			added++
-		case "removed":
-			removed++
-		}
-	}
-	return
+	return countChanges(a, b, table, len(a), len(b))
 }
 
 func nonEmptyLines(text string) []string {
@@ -195,15 +184,20 @@ func lcsTable(a, b []string) [][]int {
 	return dp
 }
 
-func backtrack(a, b []string, dp [][]int, i, j int) []cards.DiffLine {
-	if i == 0 && j == 0 {
-		return nil
+// countChanges walks the LCS table and counts added/removed lines without materializing them.
+func countChanges(a, b []string, dp [][]int, i, j int) (added, removed int) {
+	for i > 0 || j > 0 {
+		switch {
+		case i > 0 && j > 0 && a[i-1] == b[j-1]:
+			i--
+			j--
+		case j > 0 && (i == 0 || dp[i][j-1] >= dp[i-1][j]):
+			added++
+			j--
+		default:
+			removed++
+			i--
+		}
 	}
-	if i > 0 && j > 0 && a[i-1] == b[j-1] {
-		return append(backtrack(a, b, dp, i-1, j-1), cards.DiffLine{Type: "context", Text: a[i-1]})
-	}
-	if j > 0 && (i == 0 || dp[i][j-1] >= dp[i-1][j]) {
-		return append(backtrack(a, b, dp, i, j-1), cards.DiffLine{Type: "added", Text: b[j-1]})
-	}
-	return append(backtrack(a, b, dp, i-1, j), cards.DiffLine{Type: "removed", Text: a[i-1]})
+	return
 }

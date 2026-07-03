@@ -25,6 +25,13 @@ func Sign(store *services.Store, resendKey string) http.HandlerFunc {
 		userToken := ev.AuthorizationEventObject.UserOAuthToken
 		commitMsg := ev.formString("commitMessage")
 
+		if signer, err := store.GetSigner(ctx, docID, userEmail); err == nil {
+			if signer.Status == "drifted" && signer.NotifiedAt.Before(signer.DriftDetectedAt) {
+				writeActionErr(w, "The document owner needs to confirm these changes are ready for re-review first.")
+				return
+			}
+		}
+
 		revID, err := services.LatestRevisionID(ctx, userToken, docID)
 		if err != nil {
 			log.Printf("sign: LatestRevisionID: %v (non-fatal)", err)

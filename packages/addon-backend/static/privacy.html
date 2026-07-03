@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Privacy Policy — doc-align</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #202124; }
+    h1 { font-size: 1.6rem; }
+    h2 { font-size: 1.15rem; margin-top: 2rem; }
+    footer { margin-top: 3rem; font-size: 0.85rem; color: #5f6368; }
+  </style>
+</head>
+<body>
+  <h1>Privacy Policy</h1>
+  <p>Last updated: 2026-07-03</p>
+
+  <p>This policy explains what doc-align ("the Add-on") accesses and stores when installed in your Google
+  Workspace account within the docalign.app organization.</p>
+
+  <h2>What we access</h2>
+  <p>The Add-on requests the following Google OAuth scopes:</p>
+  <ul>
+    <li><code>drive.file</code> — access to the specific Google Doc you open the Add-on in (per-file, granted
+    by you), used to read revision metadata and export document text for drift detection.</li>
+    <li><code>userinfo.email</code> — your email address, used to identify you as a document owner or signer.</li>
+  </ul>
+
+  <h2>What we store</h2>
+  <p>The Add-on stores only metadata, never document content:</p>
+  <ul>
+    <li>Document title, owner, and the Drive revision ID pinned as the sign-off baseline</li>
+    <li>Signer email addresses and their sign-off status (pending, signed, or drifted), plus optional commit
+    messages</li>
+    <li>A history log of sign-off actions (who, when, which revision)</li>
+  </ul>
+  <p>The text or content of your document is never stored. It is only read transiently, in memory, to compute
+  whether a document has drifted from its signed-off revision.</p>
+
+  <h2>How we use it</h2>
+  <p>Stored data is used solely to run the sign-off workflow: showing status to owners and signers, detecting
+  drift after edits, and sending sign-off and drift notification emails via our transactional email provider
+  (Resend).</p>
+
+  <h2>Data sharing</h2>
+  <p>We do not sell or share your data with third parties, other than the transactional email provider used
+  solely to deliver the notification emails described above.</p>
+
+  <h2>Data retention</h2>
+  <p>Sign-off metadata is retained for as long as the document's sign-off record exists. You can request
+  deletion at any time by contacting us below.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about this policy can be sent to <a href="mailto:support@docalign.app">support@docalign.app</a>.</p>
+
+  <footer>doc-align &middot; <a href="/terms">Terms of Service</a></footer>
+</body>
+</html>

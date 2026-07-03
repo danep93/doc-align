@@ -28,6 +28,7 @@ func OnFileScopeGranted(store *services.Store) http.HandlerFunc {
 		}
 
 		docID := ev.resolveDocID()
+		userToken := ev.AuthorizationEventObject.UserOAuthToken
 		log.Printf("on-file-scope-granted: docs.id=%q user=%s", docID, userEmail)
 
 		if docID == "" {
@@ -58,6 +59,7 @@ func OnFileScopeGranted(store *services.Store) http.HandlerFunc {
 		}
 
 		if isOwner {
+			signerMap = services.CheckDrift(ctx, store, userToken, docID, signerMap, "")
 			writeJSON(w, cards.Push(cards.StatusOwner(doc.Title, toSignerStatusList(signerMap), docID)))
 			return
 		}
@@ -67,6 +69,7 @@ func OnFileScopeGranted(store *services.Store) http.HandlerFunc {
 			return
 		}
 
+		signerMap = services.CheckDrift(ctx, store, userToken, docID, signerMap, userEmail)
 		ownerName := services.DisplayName(doc.OwnerID)
 		allSigners := toSignerStatusList(signerMap)
 		writeJSON(w, cards.Push(cards.StatusSigner(doc.Title, ownerName, allSigners, userEmail, docID)))

@@ -61,6 +61,8 @@ func historyIconWidget(action string) *Icon {
 		return matIcon("check_circle")
 	case "drifted":
 		return matIcon("warning")
+	case "revised_notified":
+		return matIcon("mark_email_read")
 	case "review_requested":
 		return matIcon("person")
 	default:
@@ -76,6 +78,8 @@ func humanAction(action string) string {
 		return "signed off"
 	case "drifted":
 		return "drift detected"
+	case "revised_notified":
+		return "confirmed changes are ready for re-review"
 	case "review_requested":
 		return "requested review"
 	default:

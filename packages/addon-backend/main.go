@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"embed"
 	"log"
 	"net/http"
 	"os"
@@ -13,6 +14,33 @@ import (
 	"github.com/doc-align/addon-backend/services"
 	"github.com/joho/godotenv"
 )
+
+//go:embed static/terms.html static/privacy.html static/support.html static/icon.png
+var staticFS embed.FS
+
+func serveStatic(path string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		b, err := staticFS.ReadFile(path)
+		if err != nil {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(b)
+	}
+}
+
+func serveStaticPNG(path string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		b, err := staticFS.ReadFile(path)
+		if err != nil {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "image/png")
+		w.Write(b)
+	}
+}
 
 func main() {
 	_ = godotenv.Load() // load .env if present; env vars already set take precedence
@@ -71,11 +99,18 @@ func main() {
 	mux.Handle("POST /addon/quick-sign", protected(routes.QuickSign(store, resendKey)))
 	mux.Handle("POST /addon/remove-signer", protected(routes.RemoveSigner(store)))
 	mux.Handle("POST /addon/diff", protected(routes.Diff(store)))
+	mux.Handle("POST /addon/mark-revised", protected(routes.MarkRevised(store, resendKey)))
 	mux.Handle("POST /addon/history", protected(routes.History(store)))
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
+
+	// Public pages required for the Workspace Marketplace store listing (unauthenticated, no OIDC).
+	mux.HandleFunc("GET /terms", serveStatic("static/terms.html"))
+	mux.HandleFunc("GET /privacy", serveStatic("static/privacy.html"))
+	mux.HandleFunc("GET /support", serveStatic("static/support.html"))
+	mux.HandleFunc("GET /static/icon.png", serveStaticPNG("static/icon.png"))
 
 	port := os.Getenv("PORT")
 	if port == "" {
