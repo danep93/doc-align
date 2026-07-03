@@ -109,6 +109,9 @@ Document content is **never stored**. Only revision IDs and metadata.
 - **`drive.file` scope 403 on revision writes.**
   `KeepRevisionForever` is currently non-fatal — baseline creation succeeds without pinning. Investigate scope issue; may need `drive` (full) scope or owner token for revision management.
 
+- **`/healthz` does not work through Cloud Run's `*.run.app` URL — only through ngrok.**
+  Confirmed 2026-07-02: `GET /healthz` on the Cloud Run URL returns a Google-branded 404 HTML page that never reaches the container (no entry in Cloud Run request logs, no `server: Google Frontend` header). Any other unregistered path (e.g. `/foobar`) *does* reach the container and gets Go's own `404 page not found`. This means Google's edge intercepts `/healthz` specifically for `*.run.app` domains before it hits Cloud Run — it's not a bug in this app, and not something a redeploy fixes. Don't use `curl .../healthz` to verify a Cloud Run deploy; instead hit a real route (e.g. `POST /addon/homepage` without a token should return `401 missing Bearer token`). The documented `curl $NGROK_URL/healthz` check still works fine for local dev since it never goes through Cloud Run's edge.
+
 ### What's working
 
 - Cloud Run deployment confirmed live at `https://doc-align-addon-856331950906.us-central1.run.app`
@@ -140,9 +143,9 @@ Two separate concepts — understand these before running any commands:
 
 - **Deployment** (`my-addon` in `docalign-prod`): The add-on definition — HTTP endpoints, OAuth scopes, trigger config. There is **one** deployment shared by the whole org. It points to one server URL at a time. Only the project owner needs to update this when the server URL or config changes (`deployments replace`).
 
-- **Install**: Tells Google to show the add-on in a specific user's Docs sidebar. Each team member installs it **once** for their own account (`deployments install`). **You cannot install it for someone else** — each person runs the command authenticated as their own account. Installing does not create a new add-on; everyone shares the same deployment and the same Go server.
+- **Install**: doc-align is published in the Google Workspace Marketplace, so individual `gcloud workspace-add-ons deployments install` is **no longer required**. Team members get the add-on from the Marketplace listing like any other user. The only reason to touch `deployments replace` day-to-day is to point the shared deployment at your local ngrok tunnel for testing.
 
-> During local dev, whoever last ran `deployments replace` controls where Google routes requests. Coordinate with the team — only one person's ngrok server can be active at a time.
+> During local dev, whoever last ran `deployments replace` controls where Google routes requests for *everyone* (owner and Marketplace-installed users alike). Coordinate with the team — only one person's ngrok server can be active at a time, and remember to `deployments replace` back to Cloud Run (`deployment.json` as committed) when you're done testing.
 
 ---
 
@@ -198,17 +201,9 @@ ngrok config add-authtoken YOUR_AUTHTOKEN
 
 Your static domain is listed at https://dashboard.ngrok.com/domains (free tier gives one).
 
-**4a. Install the add-on for your account (every team member, once)**
+**4. (Local dev only) Point the deployment at your ngrok tunnel**
 
-This makes the add-on appear in your Google Docs sidebar. You cannot do this for another person — each team member runs it themselves, authenticated as their own account.
-
-```bash
-gcloud workspace-add-ons deployments install my-addon \
-  --project=docalign-prod \
-  --account=YOUR_NAME@docalign.app
-```
-
-**4b. (Local dev only) Point the deployment at your ngrok tunnel**
+No install step is needed to get the add-on into your sidebar — doc-align is published in the Workspace Marketplace, so it's already available to install from there like any other add-on. The step below is only for testing local changes before they're deployed.
 
 If you want to develop locally and have Google route requests to your ngrok tunnel, update all three URLs in `packages/addon-backend/deployment.json` to your ngrok URL, then:
 
@@ -241,7 +236,9 @@ gcloud run deploy doc-align-addon \
   --quiet
 ```
 
-Cloud Build builds the image and rolls out the new revision automatically. Takes ~3 minutes.
+`--source packages/addon-backend/` is relative to your **current shell working directory**, not the repo — if a prior command in the same shell session `cd`'d into `packages/addon-backend`, this fails with `could not find source [packages/addon-backend/]`. Run `pwd` first, or use `cd /path/to/doc-align &&` before the command, to be sure you're at the repo root.
+
+Cloud Build builds the image and rolls out the new revision automatically. Takes ~3 minutes. To verify it worked, don't curl `/healthz` (see Critical invariants above) — curl a real route instead, e.g. `curl -X POST https://doc-align-addon-856331950906.us-central1.run.app/addon/homepage` should return `401 missing Bearer token`.
 
 ### Pointing the Workspace add-on at Cloud Run
 
@@ -289,7 +286,7 @@ source packages/addon-backend/.env && curl -s https://$NGROK_URL/healthz
 
 Should return `200 OK`. If it hangs or errors, check that ngrok is running and the tunnel URL in `.env` matches your ngrok domain.
 
-**Open the add-on:** Go to any Google Doc on your `@docalign.app` account → click the multicolor "G" icon in the right sidebar.
+**Open the add-on:** Go to any Google Doc on your `@docalign.app` account → click the doc-align icon in the right sidebar (install from the Workspace Marketplace first if you haven't already).
 
 ---
 
