@@ -11,6 +11,14 @@ type SignerStatus struct {
 	Status          string // pending | signed | drifted
 	StatusAt        time.Time
 	CommitMessage   string
+	DriftDetectedAt time.Time
+	NotifiedAt      time.Time
+}
+
+// DriftConfirmed reports whether the owner has confirmed this signer's current drift episode
+// (i.e. notified them at or after the drift was detected). Only meaningful when Status == "drifted".
+func (s SignerStatus) DriftConfirmed() bool {
+	return !s.NotifiedAt.Before(s.DriftDetectedAt)
 }
 
 func StatusOwner(docTitle string, signers []SignerStatus, docID string) Card {
@@ -83,11 +91,18 @@ func StatusOwner(docTitle string, signers []SignerStatus, docID string) Card {
 		if s.Status == "drifted" {
 			signerWidgets = append(signerWidgets, Widget{
 				ButtonList: &ButtonList{Buttons: []Button{
-					outlinedActionButton("Notify & re-review", "/addon/diff",
+					outlinedActionButton("View changes", "/addon/diff",
 						Parameter{Key: "signerEmail", Value: s.Email},
 						Parameter{Key: "docId", Value: docID}),
 				}},
 			})
+		}
+	}
+
+	unconfirmedDrifted := 0
+	for _, s := range signers {
+		if s.Status == "drifted" && !s.DriftConfirmed() {
+			unconfirmedDrifted++
 		}
 	}
 
@@ -102,27 +117,40 @@ func StatusOwner(docTitle string, signers []SignerStatus, docID string) Card {
 		}
 	}
 
-	subtitle := fmt.Sprintf("%d of %d signed", signed, len(signers))
+	subtitle := fmt.Sprintf("%d signed · %d drifted · %d pending", signed, drifted, pending)
+
+	bottomButtons := []Button{
+		filledActionButton("Add more signers", "/addon/add-signers",
+			Parameter{Key: "docId", Value: docID}),
+		outlinedActionButton("History", "/addon/history",
+			Parameter{Key: "docId", Value: docID}),
+	}
+	sections := []Section{
+		{
+			Header:  "Signers",
+			Widgets: signerWidgets,
+		},
+	}
+	if unconfirmedDrifted > 0 {
+		sections = append(sections, Section{
+			Widgets: []Widget{
+				{ButtonList: &ButtonList{Buttons: []Button{
+					filledActionButton(fmt.Sprintf("Mark as revised & notify %d signer(s)", unconfirmedDrifted),
+						"/addon/mark-revised", Parameter{Key: "docId", Value: docID}),
+				}}},
+			},
+		})
+	}
+	sections = append(sections, Section{
+		Widgets: []Widget{
+			{ButtonList: &ButtonList{Buttons: bottomButtons}},
+		},
+	})
 
 	return Card{
-		Name:   "status_owner",
-		Header: &Header{Title: docTitle, Subtitle: subtitle},
-		Sections: []Section{
-			{
-				Header:       "Signers",
-				Widgets:      signerWidgets,
-			},
-			{
-				Widgets: []Widget{
-					{ButtonList: &ButtonList{Buttons: []Button{
-						filledActionButton("Add more signers", "/addon/add-signers",
-							Parameter{Key: "docId", Value: docID}),
-						outlinedActionButton("History", "/addon/history",
-							Parameter{Key: "docId", Value: docID}),
-					}}},
-				},
-			},
-		},
+		Name:     "status_owner",
+		Header:   &Header{Title: docTitle, Subtitle: subtitle},
+		Sections: sections,
 	}
 }
 

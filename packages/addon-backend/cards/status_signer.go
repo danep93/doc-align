@@ -41,10 +41,10 @@ func StatusSigner(docTitle, ownerName string, signers []SignerStatus, currentUse
 		})
 	}
 
-	var currentStatus string
+	var current SignerStatus
 	for _, s := range signers {
 		if s.Email == currentUserEmail {
-			currentStatus = s.Status
+			current = s
 			break
 		}
 	}
@@ -56,7 +56,7 @@ func StatusSigner(docTitle, ownerName string, signers []SignerStatus, currentUse
 		},
 	}
 
-	switch currentStatus {
+	switch current.Status {
 	case "pending":
 		sections = append(sections, Section{
 			Widgets: []Widget{
@@ -67,18 +67,31 @@ func StatusSigner(docTitle, ownerName string, signers []SignerStatus, currentUse
 			},
 		})
 	case "drifted":
-		sections = append(sections, Section{
-			Widgets: []Widget{
-				{TextParagraph: &TextParagraph{Text: "Document has changed since you signed."}},
-				{ButtonList: &ButtonList{Buttons: []Button{
-					outlinedActionButton("View version history", "/addon/diff",
-						Parameter{Key: "signerEmail", Value: currentUserEmail},
-						Parameter{Key: "docId", Value: docID}),
-					filledActionButton("Re-sign", "/addon/sign-form",
-						Parameter{Key: "docId", Value: docID}),
-				}}},
-			},
-		})
+		viewChangesButton := outlinedActionButton("View changes", "/addon/diff",
+			Parameter{Key: "signerEmail", Value: currentUserEmail},
+			Parameter{Key: "docId", Value: docID})
+
+		if current.DriftConfirmed() {
+			sections = append(sections, Section{
+				Widgets: []Widget{
+					{TextParagraph: &TextParagraph{Text: "Document has changed since you signed."}},
+					{ButtonList: &ButtonList{Buttons: []Button{
+						viewChangesButton,
+						filledActionButton("Re-sign", "/addon/sign-form",
+							Parameter{Key: "docId", Value: docID}),
+					}}},
+				},
+			})
+		} else {
+			sections = append(sections, Section{
+				Widgets: []Widget{
+					{TextParagraph: &TextParagraph{Text: fmt.Sprintf(
+						"This document has changed since you signed. %s is reviewing the changes — you'll be notified when it's ready for re-review.",
+						ownerName)}},
+					{ButtonList: &ButtonList{Buttons: []Button{viewChangesButton}}},
+				},
+			})
+		}
 	}
 
 	return Card{

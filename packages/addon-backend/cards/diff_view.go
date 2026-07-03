@@ -6,16 +6,21 @@ type DiffSection struct {
 	Title   string
 	Added   int
 	Removed int
-	Lines   []DiffLine
 }
 
-type DiffLine struct {
-	Type string // added | removed | context
-	Text string
-}
-
-func DiffView(added, removed int, sections []DiffSection) Card {
+func DiffView(docID string, added, removed int, sections []DiffSection) Card {
 	summary := fmt.Sprintf("+%d added · -%d removed", added, removed)
+
+	sectionWidgets := make([]Widget, 0, len(sections))
+	for _, sec := range sections {
+		sectionWidgets = append(sectionWidgets, Widget{
+			DecoratedText: &DecoratedText{
+				Text:        sec.Title,
+				BottomLabel: fmt.Sprintf("+%d added · -%d removed", sec.Added, sec.Removed),
+				WrapText:    true,
+			},
+		})
+	}
 
 	cardSections := []Section{
 		{
@@ -24,35 +29,22 @@ func DiffView(added, removed int, sections []DiffSection) Card {
 			},
 		},
 	}
-
-	for _, sec := range sections {
-		var lineText string
-		for _, l := range sec.Lines {
-			switch l.Type {
-			case "added":
-				lineText += fmt.Sprintf(`<font color="#1e8e3e">+ %s</font>`+"\n", l.Text)
-			case "removed":
-				lineText += fmt.Sprintf(`<font color="#d93025">- %s</font>`+"\n", l.Text)
-			default:
-				lineText += "  " + l.Text + "\n"
-			}
-		}
-		if lineText == "" {
-			lineText = fmt.Sprintf("%d added, %d removed", sec.Added, sec.Removed)
-		}
-
+	if len(sectionWidgets) > 0 {
 		cardSections = append(cardSections, Section{
-			Header: sec.Title,
-			Widgets: []Widget{
-				{TextParagraph: &TextParagraph{Text: lineText}},
-			},
+			Header:  "Changed sections",
+			Widgets: sectionWidgets,
 		})
 	}
 
+	docURL := "https://docs.google.com/document/d/" + docID + "/edit"
 	cardSections = append(cardSections, Section{
 		Widgets: []Widget{
+			{TextParagraph: &TextParagraph{Text: "For the full line-by-line diff, open the document and check File > Version history."}},
 			{ButtonList: &ButtonList{Buttons: []Button{
-				actionButton("Re-sign", "/addon/sign-form"),
+				linkButton("Open document", docURL),
+			}}},
+			{ButtonList: &ButtonList{Buttons: []Button{
+				actionButton("Re-sign", "/addon/sign-form", Parameter{Key: "docId", Value: docID}),
 				actionButton("Back", "/addon/homepage"),
 			}}},
 		},

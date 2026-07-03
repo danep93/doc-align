@@ -46,14 +46,7 @@ func Diff(store *services.Store) http.HandlerFunc {
 			return
 		}
 
-		ownerToken, err := services.GetOwnerAccessToken(ctx, store.FirestoreClient(), docID)
-		if err != nil || ownerToken == "" {
-			log.Printf("diff: GetOwnerAccessToken: %v", err)
-			writeActionErr(w, "doc-align lost access to this document. The owner needs to reconnect.")
-			return
-		}
-
-		signedText, err := services.ExportRevisionText(ctx, ownerToken, docID, signer.SignedRevisionID)
+		signedText, err := services.ExportRevisionText(ctx, userToken, docID, signer.SignedRevisionID)
 		if err != nil {
 			log.Printf("diff: ExportRevisionText %s: %v", signer.SignedRevisionID, err)
 			writeActionErr(w, "The baseline revision is no longer available. The owner may need to recreate the baseline.")
@@ -62,6 +55,6 @@ func Diff(store *services.Store) http.HandlerFunc {
 
 		result := services.DetectDrift(currentText, signedText)
 		_ = doc // title available if needed for header
-		writeJSON(w, cards.Push(cards.DiffView(result.Added, result.Removed, result.Sections)))
+		writeJSON(w, cards.Push(cards.DiffView(docID, result.Added, result.Removed, result.Sections)))
 	}
 }

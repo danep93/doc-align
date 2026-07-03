@@ -25,6 +25,13 @@ func QuickSign(store *services.Store, resendKey string) http.HandlerFunc {
 		userToken := ev.AuthorizationEventObject.UserOAuthToken
 		message := ev.param("message")
 
+		if signer, err := store.GetSigner(ctx, docID, userEmail); err == nil {
+			if signer.Status == "drifted" && signer.NotifiedAt.Before(signer.DriftDetectedAt) {
+				writeActionErr(w, "The document owner needs to confirm these changes are ready for re-review first.")
+				return
+			}
+		}
+
 		revID, err := services.LatestRevisionID(ctx, userToken, docID)
 		if err != nil {
 			log.Printf("quick-sign: LatestRevisionID: %v (non-fatal)", err)

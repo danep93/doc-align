@@ -124,6 +124,41 @@ func SendSignedNotification(apiKey, ownerEmail, signerEmail, docTitle, docID str
 	return resendSend(apiKey, ownerEmail, subject, plainText, htmlBody)
 }
 
+func SendDriftNotification(apiKey, signerEmail, ownerEmail, docTitle, docID string, added, removed int) error {
+	if apiKey == "" {
+		return fmt.Errorf("RESEND_API_KEY not set")
+	}
+
+	ownerName := DisplayName(ownerEmail)
+	docURL := "https://docs.google.com/document/d/" + docID + "/edit"
+
+	subject := fmt.Sprintf("%s updated %q — please re-review", ownerName, docTitle)
+
+	plainText := fmt.Sprintf(
+		"%s made changes to \"%s\" since you signed off (+%d added / -%d removed).\n\nOpen the document to re-review and sign off again from the sidebar:\n%s",
+		ownerName, docTitle, added, removed, docURL,
+	)
+
+	htmlBody := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<body style="font-family:sans-serif;max-width:560px;margin:40px auto;color:#1f2328">
+  <p><strong>%s</strong> made changes to the following document since you signed off (+%d added / -%d removed):</p>
+  <p style="font-size:18px;font-weight:600">%s</p>
+  <p>Open the document to re-review and sign off again from the sidebar.</p>
+  <p>
+    <a href="%s"
+       style="display:inline-block;padding:10px 20px;background:#1a73e8;color:#fff;text-decoration:none;border-radius:4px;font-weight:600">
+      Open document
+    </a>
+  </p>
+  <hr style="margin-top:40px;border:none;border-top:1px solid #e1e4e8">
+  <p style="color:#6e7781;font-size:12px">Sent by DocAlign on behalf of %s.</p>
+</body>
+</html>`, ownerName, added, removed, docTitle, docURL, ownerEmail)
+
+	return resendSend(apiKey, signerEmail, subject, plainText, htmlBody)
+}
+
 // DisplayName extracts a capitalized first name from an email address.
 // "rahul@docalign.app" → "Rahul"
 func DisplayName(email string) string {

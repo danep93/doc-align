@@ -23,6 +23,7 @@ func Homepage(store *services.Store) http.HandlerFunc {
 		}
 
 		docID := ev.Docs.ID
+		userToken := ev.AuthorizationEventObject.UserOAuthToken
 		log.Printf("homepage: docs.id=%q title=%q user=%s", docID, ev.Docs.Title, userEmail)
 
 		if docID == "" {
@@ -53,6 +54,7 @@ func Homepage(store *services.Store) http.HandlerFunc {
 
 		if isOwner {
 			log.Printf("homepage: showing StatusOwner to %s for doc %s", userEmail, docID)
+			signerMap = services.CheckDrift(ctx, store, userToken, docID, signerMap, "")
 			signerStatuses := toSignerStatusList(signerMap)
 			writeJSON(w, cards.StatusOwner(doc.Title, signerStatuses, docID))
 			return
@@ -66,6 +68,7 @@ func Homepage(store *services.Store) http.HandlerFunc {
 			return
 		}
 
+		signerMap = services.CheckDrift(ctx, store, userToken, docID, signerMap, userEmail)
 		ownerName := services.DisplayName(doc.OwnerID)
 		allSigners := toSignerStatusList(signerMap)
 		writeJSON(w, cards.StatusSigner(doc.Title, ownerName, allSigners, userEmail, docID))
@@ -94,9 +97,11 @@ func signerMapKeys(m map[string]services.SignerRecord) []string {
 
 func recordToStatus(email string, rec services.SignerRecord) cards.SignerStatus {
 	return cards.SignerStatus{
-		Email:         email,
-		Status:        rec.Status,
-		StatusAt:      rec.SignedAt,
-		CommitMessage: rec.CommitMessage,
+		Email:           email,
+		Status:          rec.Status,
+		StatusAt:        rec.SignedAt,
+		CommitMessage:   rec.CommitMessage,
+		DriftDetectedAt: rec.DriftDetectedAt,
+		NotifiedAt:      rec.NotifiedAt,
 	}
 }
