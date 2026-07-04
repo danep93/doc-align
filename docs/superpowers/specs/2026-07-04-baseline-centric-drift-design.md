@@ -96,7 +96,7 @@ Drift state for a signer is derived: `signer.signedVersion < doc.confirmedVersio
   the **baseline** revision text (`ExportRevisionText` — works, owner token), run
   `DetectDrift`, and:
   - store the change summary + owner note on the doc record,
-  - increment `confirmedVersion`, set `confirmedAt`,
+  - increment `confirmedVersion`, set `confirmedModifiedTime`,
   - pin the new latest revision as the new `baselineRevisionId`
     (`LatestRevisionID` + `KeepRevisionForever`, both valid with owner token),
   - email drifted signers (existing `SendDriftNotification`, now including section
@@ -114,7 +114,7 @@ Drift state for a signer is derived: `signer.signedVersion < doc.confirmedVersio
   rendering the stored `changeSummary` (no Drive calls, works for viewer-signers).
 
 **Baseline creation** (`routes/create_baseline.go`)
-- Unchanged except: initialize `confirmedVersion = 1`, `confirmedAt = now`. The existing
+- Unchanged except: initialize `confirmedVersion = 1`, `confirmedModifiedTime` from Drive. The existing
   empty-revID fallback stays (baseline still owner-token, still works).
 
 ## Error handling
