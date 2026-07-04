@@ -15,13 +15,7 @@ type SignerStatus struct {
 	NotifiedAt      time.Time
 }
 
-// DriftConfirmed reports whether the owner has confirmed this signer's current drift episode
-// (i.e. notified them at or after the drift was detected). Only meaningful when Status == "drifted".
-func (s SignerStatus) DriftConfirmed() bool {
-	return !s.NotifiedAt.Before(s.DriftDetectedAt)
-}
-
-func StatusOwner(docTitle string, signers []SignerStatus, docID string) Card {
+func StatusOwner(docTitle string, signers []SignerStatus, docID string, docChanged bool) Card {
 	signed := 0
 	drifted := 0
 	pending := 0
@@ -87,23 +81,6 @@ func StatusOwner(docTitle string, signers []SignerStatus, docID string) Card {
 			},
 		}
 		signerWidgets = append(signerWidgets, w)
-
-		if s.Status == "drifted" {
-			signerWidgets = append(signerWidgets, Widget{
-				ButtonList: &ButtonList{Buttons: []Button{
-					outlinedActionButton("View changes", "/addon/diff",
-						Parameter{Key: "signerEmail", Value: s.Email},
-						Parameter{Key: "docId", Value: docID}),
-				}},
-			})
-		}
-	}
-
-	unconfirmedDrifted := 0
-	for _, s := range signers {
-		if s.Status == "drifted" && !s.DriftConfirmed() {
-			unconfirmedDrifted++
-		}
 	}
 
 	if len(signerWidgets) == 0 {
@@ -131,11 +108,19 @@ func StatusOwner(docTitle string, signers []SignerStatus, docID string) Card {
 			Widgets: signerWidgets,
 		},
 	}
-	if unconfirmedDrifted > 0 {
+	if docChanged {
 		sections = append(sections, Section{
+			Header: "Unconfirmed changes",
 			Widgets: []Widget{
+				{TextParagraph: &TextParagraph{Text: "The document has changed since the last confirmed version. Sign-offs are paused until you confirm."}},
+				{TextInput: &TextInput{
+					Name:     "confirmNote",
+					Label:    "Note for signers (optional)",
+					HintText: "What changed and why",
+					Type:     "MULTIPLE_LINE",
+				}},
 				{ButtonList: &ButtonList{Buttons: []Button{
-					filledActionButton(fmt.Sprintf("Mark as revised & notify %d signer(s)", unconfirmedDrifted),
+					filledActionButton("Confirm new version & notify signers",
 						"/addon/mark-revised", Parameter{Key: "docId", Value: docID}),
 				}}},
 			},

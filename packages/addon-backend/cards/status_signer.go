@@ -2,7 +2,7 @@ package cards
 
 import "fmt"
 
-func StatusSigner(docTitle, ownerName string, signers []SignerStatus, currentUserEmail string, docID string) Card {
+func StatusSigner(docTitle, ownerName string, signers []SignerStatus, currentUserEmail string, docID string, docChanged bool, summary *ChangeSummaryView) Card {
 	sorted := make([]SignerStatus, 0, len(signers))
 	for _, s := range signers {
 		if s.Status == "drifted" {
@@ -56,41 +56,46 @@ func StatusSigner(docTitle, ownerName string, signers []SignerStatus, currentUse
 		},
 	}
 
-	switch current.Status {
-	case "pending":
+	if docChanged {
+		// Unconfirmed changes lock EVERYONE — pending and drifted alike. Nobody signs
+		// off on a version the owner hasn't confirmed.
 		sections = append(sections, Section{
 			Widgets: []Widget{
+				{TextParagraph: &TextParagraph{Text: fmt.Sprintf(
+					"This document has changed since the last confirmed version. Signing is paused until %s confirms the changes.",
+					ownerName)}},
 				{ButtonList: &ButtonList{Buttons: []Button{
-					filledActionButton("Sign this document", "/addon/sign-form",
+					outlinedActionButton("Remind owner", "/addon/notify-owner",
 						Parameter{Key: "docId", Value: docID}),
 				}}},
 			},
 		})
-	case "drifted":
-		viewChangesButton := outlinedActionButton("View changes", "/addon/diff",
-			Parameter{Key: "signerEmail", Value: currentUserEmail},
-			Parameter{Key: "docId", Value: docID})
-
-		if current.DriftConfirmed() {
+	} else {
+		switch current.Status {
+		case "pending":
 			sections = append(sections, Section{
 				Widgets: []Widget{
-					{TextParagraph: &TextParagraph{Text: "Document has changed since you signed."}},
 					{ButtonList: &ButtonList{Buttons: []Button{
-						viewChangesButton,
-						filledActionButton("Re-sign", "/addon/sign-form",
+						filledActionButton("Sign this document", "/addon/sign-form",
 							Parameter{Key: "docId", Value: docID}),
 					}}},
 				},
 			})
-		} else {
-			sections = append(sections, Section{
-				Widgets: []Widget{
-					{TextParagraph: &TextParagraph{Text: fmt.Sprintf(
-						"This document has changed since you signed. %s is reviewing the changes — you'll be notified when it's ready for re-review.",
-						ownerName)}},
-					{ButtonList: &ButtonList{Buttons: []Button{viewChangesButton}}},
-				},
-			})
+		case "drifted":
+			widgets := []Widget{
+				{TextParagraph: &TextParagraph{Text: "The document changed since you signed. Review the changes and re-sign."}},
+			}
+			if summary != nil {
+				widgets = append(widgets, changeSummaryWidgets(*summary)...)
+				widgets = append(widgets, Widget{ButtonList: &ButtonList{Buttons: []Button{
+					linkButton("View in Google Docs", VersionHistoryURL(docID, summary.FromRevisionID, summary.ToRevisionID)),
+				}}})
+			}
+			widgets = append(widgets, Widget{ButtonList: &ButtonList{Buttons: []Button{
+				filledActionButton("Re-sign", "/addon/sign-form",
+					Parameter{Key: "docId", Value: docID}),
+			}}})
+			sections = append(sections, Section{Header: "What changed", Widgets: widgets})
 		}
 	}
 
