@@ -124,7 +124,7 @@ func SendSignedNotification(apiKey, ownerEmail, signerEmail, docTitle, docID str
 	return resendSend(apiKey, ownerEmail, subject, plainText, htmlBody)
 }
 
-func SendDriftNotification(apiKey, signerEmail, ownerEmail, docTitle, docID string, added, removed int) error {
+func SendDriftNotification(apiKey, signerEmail, ownerEmail, docTitle, docID string, summary ChangeSummary) error {
 	if apiKey == "" {
 		return fmt.Errorf("RESEND_API_KEY not set")
 	}
@@ -134,16 +134,31 @@ func SendDriftNotification(apiKey, signerEmail, ownerEmail, docTitle, docID stri
 
 	subject := fmt.Sprintf("%s updated %q — please re-review", ownerName, docTitle)
 
+	var sectionLines strings.Builder
+	var sectionHTML strings.Builder
+	for _, s := range summary.Sections {
+		sectionLines.WriteString(fmt.Sprintf("  • %s (+%d / -%d)\n", s.Title, s.Added, s.Removed))
+		sectionHTML.WriteString(fmt.Sprintf("<li>%s <span style=\"color:#6e7781\">(+%d / -%d)</span></li>", s.Title, s.Added, s.Removed))
+	}
+	noteText := ""
+	noteHTML := ""
+	if summary.Note != "" {
+		noteText = fmt.Sprintf("\nNote from %s: %s\n", ownerName, summary.Note)
+		noteHTML = fmt.Sprintf("<p><em>Note from %s:</em> %s</p>", ownerName, summary.Note)
+	}
+
 	plainText := fmt.Sprintf(
-		"%s made changes to \"%s\" since you signed off (+%d added / -%d removed).\n\nOpen the document to re-review and sign off again from the sidebar:\n%s",
-		ownerName, docTitle, added, removed, docURL,
+		"%s confirmed changes to \"%s\" since you signed off (+%d added / -%d removed).\n\nChanged sections:\n%s%s\nOpen the document to re-review and sign off again from the sidebar:\n%s",
+		ownerName, docTitle, summary.TotalAdded, summary.TotalRemoved, sectionLines.String(), noteText, docURL,
 	)
 
 	htmlBody := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <body style="font-family:sans-serif;max-width:560px;margin:40px auto;color:#1f2328">
-  <p><strong>%s</strong> made changes to the following document since you signed off (+%d added / -%d removed):</p>
+  <p><strong>%s</strong> confirmed changes to the following document since you signed off (+%d added / -%d removed):</p>
   <p style="font-size:18px;font-weight:600">%s</p>
+  <ul>%s</ul>
+  %s
   <p>Open the document to re-review and sign off again from the sidebar.</p>
   <p>
     <a href="%s"
@@ -154,7 +169,7 @@ func SendDriftNotification(apiKey, signerEmail, ownerEmail, docTitle, docID stri
   <hr style="margin-top:40px;border:none;border-top:1px solid #e1e4e8">
   <p style="color:#6e7781;font-size:12px">Sent by DocAlign on behalf of %s.</p>
 </body>
-</html>`, ownerName, added, removed, docTitle, docURL, ownerEmail)
+</html>`, ownerName, summary.TotalAdded, summary.TotalRemoved, docTitle, sectionHTML.String(), noteHTML, docURL, ownerEmail)
 
 	return resendSend(apiKey, signerEmail, subject, plainText, htmlBody)
 }

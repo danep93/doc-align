@@ -41,6 +41,6 @@ func RemoveSigner(store *services.Store) http.HandlerFunc {
 
 		signerMap, _ := store.ListSigners(ctx, docID)
 		signerStatuses := toSignerStatusList(signerMap)
-		writeJSON(w, cards.Update(cards.StatusOwner(doc.Title, signerStatuses, docID)))
+		writeJSON(w, cards.Update(cards.StatusOwner(doc.Title, signerStatuses, docID, false)))
 	}
 }
