@@ -48,7 +48,9 @@ documents/{docId}
   baselineRevisionId                            — unchanged (owner token pins it)
   confirmedVersion: int                         — NEW, starts at 1 on baseline creation,
                                                   incremented on each owner confirm
-  confirmedAt: timestamp                        — NEW, when current version was confirmed
+  confirmedModifiedTime: timestamp              — NEW, Drive modifiedTime captured at confirm
+                                                  (drift = current modifiedTime is after this;
+                                                  Drive-clock vs Drive-clock, no server-clock skew)
   changeSummary: {                              — NEW, replaced wholesale on each confirm
     note: string                                — owner-typed note (optional)
     sections: [{title, added, removed}]         — from DetectDrift
@@ -80,7 +82,7 @@ Drift state for a signer is derived: `signer.signedVersion < doc.confirmedVersio
 
 **Doc-changed check** (replaces `services/drift_check.go` per-signer logic)
 - On sidebar open (homepage), compare Drive `modifiedTime` of the file against
-  `doc.confirmedAt`. `files.get(fields=modifiedTime)` works with any user's `drive.file`
+  `doc.confirmedModifiedTime`. `files.get(fields=modifiedTime)` works with any user's `drive.file`
   token — no Revisions API. This is the cheap lazy check from CLAUDE.md, applied at the
   document level instead of per-signer.
 - If changed: doc is in **unconfirmed drift**. Signers with `signedVersion ==
