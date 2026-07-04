@@ -21,7 +21,7 @@ type AddonEvent struct {
 		MessageID string `json:"messageId"`
 	} `json:"gmail"`
 	AuthorizationEventObject struct {
-		UserOAuthToken  string   `json:"userOAuthToken"`
+		UserOAuthToken   string   `json:"userOAuthToken"`
 		AuthorizedScopes []string `json:"authorizedScopes"`
 	} `json:"authorizationEventObject"`
 	FormInput struct {

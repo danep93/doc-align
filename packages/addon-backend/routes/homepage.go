@@ -52,26 +52,24 @@ func Homepage(store *services.Store) http.HandlerFunc {
 			return
 		}
 
+		docChanged, signerMap := services.CheckDocDrift(ctx, store, userToken, docID, doc, signerMap)
+
 		if isOwner {
-			log.Printf("homepage: showing StatusOwner to %s for doc %s", userEmail, docID)
-			signerMap = services.CheckDrift(ctx, store, userToken, docID, signerMap, "")
-			signerStatuses := toSignerStatusList(signerMap)
-			writeJSON(w, cards.StatusOwner(doc.Title, signerStatuses, docID))
+			log.Printf("homepage: showing StatusOwner to %s for doc %s (docChanged=%v)", userEmail, docID, docChanged)
+			writeJSON(w, cards.StatusOwner(doc.Title, toSignerStatusList(signerMap), docID, docChanged))
 			return
 		}
 
 		// Signer view
 		_, isSigner := signerMap[userEmail]
-		log.Printf("homepage: user=%s docOwner=%s isSigner=%v signerMapKeys=%v", userEmail, doc.OwnerID, isSigner, signerMapKeys(signerMap))
+		log.Printf("homepage: user=%s docOwner=%s isSigner=%v docChanged=%v", userEmail, doc.OwnerID, isSigner, docChanged)
 		if !isSigner {
 			writeJSON(w, cards.EmptyState(false, docID))
 			return
 		}
 
-		signerMap = services.CheckDrift(ctx, store, userToken, docID, signerMap, userEmail)
 		ownerName := services.DisplayName(doc.OwnerID)
-		allSigners := toSignerStatusList(signerMap)
-		writeJSON(w, cards.StatusSigner(doc.Title, ownerName, allSigners, userEmail, docID))
+		writeJSON(w, cards.StatusSigner(doc.Title, ownerName, toSignerStatusList(signerMap), userEmail, docID, docChanged, summaryToView(doc.ChangeSummary)))
 	}
 }
 
@@ -85,14 +83,6 @@ func toSignerStatusList(m map[string]services.SignerRecord) []cards.SignerStatus
 		result = append(result, recordToStatus(email, rec))
 	}
 	return result
-}
-
-func signerMapKeys(m map[string]services.SignerRecord) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
 }
 
 func recordToStatus(email string, rec services.SignerRecord) cards.SignerStatus {

@@ -58,9 +58,10 @@ func OnFileScopeGranted(store *services.Store) http.HandlerFunc {
 			return
 		}
 
+		docChanged, signerMap := services.CheckDocDrift(ctx, store, userToken, docID, doc, signerMap)
+
 		if isOwner {
-			signerMap = services.CheckDrift(ctx, store, userToken, docID, signerMap, "")
-			writeJSON(w, cards.Push(cards.StatusOwner(doc.Title, toSignerStatusList(signerMap), docID)))
+			writeJSON(w, cards.Push(cards.StatusOwner(doc.Title, toSignerStatusList(signerMap), docID, docChanged)))
 			return
 		}
 
@@ -69,9 +70,7 @@ func OnFileScopeGranted(store *services.Store) http.HandlerFunc {
 			return
 		}
 
-		signerMap = services.CheckDrift(ctx, store, userToken, docID, signerMap, userEmail)
 		ownerName := services.DisplayName(doc.OwnerID)
-		allSigners := toSignerStatusList(signerMap)
-		writeJSON(w, cards.Push(cards.StatusSigner(doc.Title, ownerName, allSigners, userEmail, docID)))
+		writeJSON(w, cards.Push(cards.StatusSigner(doc.Title, ownerName, toSignerStatusList(signerMap), userEmail, docID, docChanged, summaryToView(doc.ChangeSummary))))
 	}
 }

@@ -34,7 +34,6 @@ packages/addon-backend/
   services/doc_text.go         — Docs API: fetch current text
   services/doc_revisions.go    — Drive Revisions API
   services/drift_detection.go  — LCS diff + section scoring
-  services/owner_token.go      — Owner OAuth token store
 ```
 
 ### Core user flows
@@ -43,7 +42,7 @@ packages/addon-backend/
 
 **Signer flow:** Gets email with doc link → opens sidebar → StatusSigner card → clicks "Sign this doc" → SignForm (optional commit message or quick-sign chip) → signs → status = `signed`.
 
-**Drift + re-review:** Owner edits doc → reopens sidebar → lazy drift check runs (compares `modifiedTime` vs `signedAt`, marks `drifted`) → owner clicks "Notify signatories" → AI generates change summary → drift email sent → signer re-opens sidebar → sees drift summary → clicks "View version history" (opens native revisions page) or "Re-sign".
+**Drift + re-review:** Owner reopens sidebar → lazy doc-level drift check runs (compares current `modifiedTime` against the doc's `confirmedModifiedTime`) → if changed, **everyone is locked** — no one can sign until the owner acts. Owner sees "Confirm new version", optionally adds a note, and confirms → server diffs the pinned baseline against current text using the owner's live token, stores the section-level `changeSummary` (headings + counts + note, never document text), bumps `confirmedVersion`, pins a new baseline, and emails drifted signers. Signers whose `signedVersion` is behind `confirmedVersion` see the drift summary and must re-sign; they can also nudge the owner via "Notify owner" if they spot drift before the owner does.
 
 **Drift check is lazy** — only runs on sidebar open, no background jobs. Post-MVP: replace `modifiedTime` comparison with Claude Haiku classification to ignore cosmetic edits.
 
@@ -78,10 +77,10 @@ config/secrets
   resendApiKey — Resend API key (read by server at startup; env var RESEND_API_KEY overrides)
 
 documents/{docId}
-  title, ownerId, ownerRefreshToken (encrypted KMS), baselineRevisionId, lastDriftCheckedAt, createdAt
+  title, ownerId, baselineRevisionId, confirmedVersion, confirmedModifiedTime, changeSummary {note, sections[], totalAdded, totalRemoved, fromRevisionId, toRevisionId}, createdAt
 
 documents/{docId}/signers/{email}
-  status (pending | signed | drifted), signedAt, signedRevisionId, commitMessage, notifiedAt
+  status (pending | signed | drifted), signedAt, signedVersion, commitMessage, notifiedAt
 
 documents/{docId}/history/{id}
   action, actorEmail, commitMessage, revisionId, timestamp
@@ -109,6 +108,8 @@ Document content is **never stored**. Only revision IDs and metadata.
 - **`drive.file` scope 403 on revision writes.**
   `KeepRevisionForever` is currently non-fatal — baseline creation succeeds without pinning. Investigate scope issue; may need `drive` (full) scope or owner token for revision management.
 
+- **Signer tokens never call the Revisions API — it silently returns an empty list for non-owners** (root cause of the original drift bug). Revision operations are owner-live-token only.
+
 - **`/healthz` does not work through Cloud Run's `*.run.app` URL — only through ngrok.**
   Confirmed 2026-07-02: `GET /healthz` on the Cloud Run URL returns a Google-branded 404 HTML page that never reaches the container (no entry in Cloud Run request logs, no `server: Google Frontend` header). Any other unregistered path (e.g. `/foobar`) *does* reach the container and gets Go's own `404 page not found`. This means Google's edge intercepts `/healthz` specifically for `*.run.app` domains before it hits Cloud Run — it's not a bug in this app, and not something a redeploy fixes. Don't use `curl .../healthz` to verify a Cloud Run deploy; instead hit a real route (e.g. `POST /addon/homepage` without a token should return `401 missing Bearer token`). The documented `curl $NGROK_URL/healthz` check still works fine for local dev since it never goes through Cloud Run's edge.
 
@@ -127,11 +128,10 @@ Document content is **never stored**. Only revision IDs and metadata.
 ### What's left to build
 
 - **Signer flow** — StatusSigner → SignForm → Sign → back to StatusSigner (in active testing)
-- **Drift detection wiring** — `services/drift_detection.go` exists but nothing triggers it on homepage open
-- **Owner token / OAuth callback** — `ownerRefreshToken` is never written; need an OAuth callback endpoint; manual Firestore write for testing in the meantime
-- **Diff view** — blocked on `ownerRefreshToken` in Firestore
+- **Drift detection wiring** — done: doc-level `modifiedTime` check runs on homepage open, owner confirm via `/addon/mark-revised`, signer nudge via `/addon/notify-owner`
 - **History card** — not tested
 - **Multi-user flows** — owner + signer in separate accounts
+- **Verify signers' Drive access at save-signers time** (Permissions API) — open question from spec
 
 ---
 

@@ -69,11 +69,11 @@ type Section struct {
 }
 
 type Widget struct {
-	TextParagraph   *TextParagraph   `json:"textParagraph,omitempty"`
-	DecoratedText   *DecoratedText   `json:"decoratedText,omitempty"`
-	ButtonList      *ButtonList      `json:"buttonList,omitempty"`
-	TextInput       *TextInput       `json:"textInput,omitempty"`
-	SelectionInput  *SelectionInput  `json:"selectionInput,omitempty"`
+	TextParagraph  *TextParagraph  `json:"textParagraph,omitempty"`
+	DecoratedText  *DecoratedText  `json:"decoratedText,omitempty"`
+	ButtonList     *ButtonList     `json:"buttonList,omitempty"`
+	TextInput      *TextInput      `json:"textInput,omitempty"`
+	SelectionInput *SelectionInput `json:"selectionInput,omitempty"`
 }
 
 type TextParagraph struct {
@@ -81,12 +81,12 @@ type TextParagraph struct {
 }
 
 type DecoratedText struct {
-	TopLabel         string   `json:"topLabel,omitempty"`
-	Text             string   `json:"text"`
-	BottomLabel      string   `json:"bottomLabel,omitempty"`
-	StartIcon        *Icon    `json:"startIcon,omitempty"`
-	Button           *Button  `json:"button,omitempty"`
-	WrapText         bool     `json:"wrapText,omitempty"`
+	TopLabel    string  `json:"topLabel,omitempty"`
+	Text        string  `json:"text"`
+	BottomLabel string  `json:"bottomLabel,omitempty"`
+	StartIcon   *Icon   `json:"startIcon,omitempty"`
+	Button      *Button `json:"button,omitempty"`
+	WrapText    bool    `json:"wrapText,omitempty"`
 }
 
 type Icon struct {
@@ -121,15 +121,15 @@ type Color struct {
 }
 
 type OnClick struct {
-	Action   *FormAction  `json:"action,omitempty"`
-	OpenLink *OpenLink    `json:"openLink,omitempty"`
+	Action   *FormAction `json:"action,omitempty"`
+	OpenLink *OpenLink   `json:"openLink,omitempty"`
 }
 
 type FormAction struct {
-	Function    string      `json:"function"`
-	Parameters  []Parameter `json:"parameters,omitempty"`
+	Function   string      `json:"function"`
+	Parameters []Parameter `json:"parameters,omitempty"`
 	// Interaction 2 = REQUEST_FILE_SCOPE (proto enum value; string form rejected by current runtime).
-	Interaction int         `json:"interaction,omitempty"`
+	Interaction int `json:"interaction,omitempty"`
 }
 
 type Parameter struct {
@@ -150,11 +150,11 @@ type TextInput struct {
 }
 
 type SelectionInput struct {
-	Name          string          `json:"name"`
-	Label         string          `json:"label"`
-	Type          string          `json:"type"` // MULTI_SELECT, CHECK_BOX, RADIO_BUTTON, SWITCH
-	Items         []SelectionItem `json:"items"`
-	OnChangeAction *FormAction    `json:"onChangeAction,omitempty"`
+	Name           string          `json:"name"`
+	Label          string          `json:"label"`
+	Type           string          `json:"type"` // MULTI_SELECT, CHECK_BOX, RADIO_BUTTON, SWITCH
+	Items          []SelectionItem `json:"items"`
+	OnChangeAction *FormAction     `json:"onChangeAction,omitempty"`
 }
 
 type SelectionItem struct {

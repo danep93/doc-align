@@ -8,21 +8,39 @@ import (
 )
 
 type DocRecord struct {
-	Title               string    `firestore:"title"`
-	OwnerID             string    `firestore:"ownerId"`
-	OwnerRefreshToken   string    `firestore:"ownerRefreshToken"` // plaintext for MVP; KMS in Phase 2
-	BaselineRevisionID  string    `firestore:"baselineRevisionId"`
-	LastDriftCheckedAt  time.Time `firestore:"lastDriftCheckedAt"`
-	CreatedAt           time.Time `firestore:"createdAt"`
+	Title                 string         `firestore:"title"`
+	OwnerID               string         `firestore:"ownerId"`
+	BaselineRevisionID    string         `firestore:"baselineRevisionId"`
+	ConfirmedVersion      int            `firestore:"confirmedVersion"`
+	ConfirmedModifiedTime time.Time      `firestore:"confirmedModifiedTime"`
+	ChangeSummary         *ChangeSummary `firestore:"changeSummary"`
+	CreatedAt             time.Time      `firestore:"createdAt"`
+}
+
+// ChangeSummary is the only record of what changed between confirmed versions.
+// Section headings and line counts only — document content is never stored.
+type ChangeSummary struct {
+	Note           string          `firestore:"note"`
+	Sections       []ChangeSection `firestore:"sections"`
+	TotalAdded     int             `firestore:"totalAdded"`
+	TotalRemoved   int             `firestore:"totalRemoved"`
+	FromRevisionID string          `firestore:"fromRevisionId"`
+	ToRevisionID   string          `firestore:"toRevisionId"`
+}
+
+type ChangeSection struct {
+	Title   string `firestore:"title"`
+	Added   int    `firestore:"added"`
+	Removed int    `firestore:"removed"`
 }
 
 type SignerRecord struct {
-	Status            string    `firestore:"status"` // pending | signed | drifted
-	SignedAt          time.Time `firestore:"signedAt"`
-	SignedRevisionID  string    `firestore:"signedRevisionId"`
-	CommitMessage     string    `firestore:"commitMessage"`
-	DriftDetectedAt   time.Time `firestore:"driftDetectedAt"`
-	NotifiedAt        time.Time `firestore:"notifiedAt"`
+	Status          string    `firestore:"status"` // pending | signed | drifted
+	SignedAt        time.Time `firestore:"signedAt"`
+	SignedVersion   int       `firestore:"signedVersion"`
+	CommitMessage   string    `firestore:"commitMessage"`
+	DriftDetectedAt time.Time `firestore:"driftDetectedAt"`
+	NotifiedAt      time.Time `firestore:"notifiedAt"`
 }
 
 type HistoryRecord struct {
@@ -70,9 +88,15 @@ func (s *Store) UpdateBaselineRevision(ctx context.Context, docID, revID string)
 	return err
 }
 
-func (s *Store) UpdateLastDriftCheck(ctx context.Context, docID string, t time.Time) error {
+// ConfirmNewVersion atomically records the owner's confirmation of the current doc state:
+// new version number, the Drive modifiedTime captured at confirm, the computed change
+// summary, and the freshly pinned baseline revision.
+func (s *Store) ConfirmNewVersion(ctx context.Context, docID string, newVersion int, summary ChangeSummary, newBaselineRevID string, modifiedTime time.Time) error {
 	_, err := s.client.Collection("documents").Doc(docID).Update(ctx, []firestore.Update{
-		{Path: "lastDriftCheckedAt", Value: t},
+		{Path: "confirmedVersion", Value: newVersion},
+		{Path: "confirmedModifiedTime", Value: modifiedTime},
+		{Path: "changeSummary", Value: summary},
+		{Path: "baselineRevisionId", Value: newBaselineRevID},
 	})
 	return err
 }

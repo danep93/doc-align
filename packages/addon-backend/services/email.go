@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"strings"
@@ -42,7 +43,7 @@ func SendSignoffRequest(apiKey, ownerEmail, docTitle, docID string, signerEmails
     You received this because you were added as a signer on this document.
   </p>
 </body>
-</html>`, ownerName, docTitle, docURL, ownerEmail)
+</html>`, ownerName, html.EscapeString(docTitle), docURL, ownerEmail)
 
 	var errs []string
 	for _, to := range signerEmails {
@@ -119,12 +120,12 @@ func SendSignedNotification(apiKey, ownerEmail, signerEmail, docTitle, docID str
   <hr style="margin-top:40px;border:none;border-top:1px solid #e1e4e8">
   <p style="color:#6e7781;font-size:12px">Sent by DocAlign.</p>
 </body>
-</html>`, signerName, docTitle, docURL)
+</html>`, signerName, html.EscapeString(docTitle), docURL)
 
 	return resendSend(apiKey, ownerEmail, subject, plainText, htmlBody)
 }
 
-func SendDriftNotification(apiKey, signerEmail, ownerEmail, docTitle, docID string, added, removed int) error {
+func SendDriftNotification(apiKey, signerEmail, ownerEmail, docTitle, docID string, summary ChangeSummary) error {
 	if apiKey == "" {
 		return fmt.Errorf("RESEND_API_KEY not set")
 	}
@@ -134,16 +135,31 @@ func SendDriftNotification(apiKey, signerEmail, ownerEmail, docTitle, docID stri
 
 	subject := fmt.Sprintf("%s updated %q — please re-review", ownerName, docTitle)
 
+	var sectionLines strings.Builder
+	var sectionHTML strings.Builder
+	for _, s := range summary.Sections {
+		sectionLines.WriteString(fmt.Sprintf("  • %s (+%d / -%d)\n", s.Title, s.Added, s.Removed))
+		sectionHTML.WriteString(fmt.Sprintf("<li>%s <span style=\"color:#6e7781\">(+%d / -%d)</span></li>", html.EscapeString(s.Title), s.Added, s.Removed))
+	}
+	noteText := ""
+	noteHTML := ""
+	if summary.Note != "" {
+		noteText = fmt.Sprintf("\nNote from %s: %s\n", ownerName, summary.Note)
+		noteHTML = fmt.Sprintf("<p><em>Note from %s:</em> %s</p>", ownerName, html.EscapeString(summary.Note))
+	}
+
 	plainText := fmt.Sprintf(
-		"%s made changes to \"%s\" since you signed off (+%d added / -%d removed).\n\nOpen the document to re-review and sign off again from the sidebar:\n%s",
-		ownerName, docTitle, added, removed, docURL,
+		"%s confirmed changes to \"%s\" since you signed off (+%d added / -%d removed).\n\nChanged sections:\n%s%s\nOpen the document to re-review and sign off again from the sidebar:\n%s",
+		ownerName, docTitle, summary.TotalAdded, summary.TotalRemoved, sectionLines.String(), noteText, docURL,
 	)
 
 	htmlBody := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <body style="font-family:sans-serif;max-width:560px;margin:40px auto;color:#1f2328">
-  <p><strong>%s</strong> made changes to the following document since you signed off (+%d added / -%d removed):</p>
+  <p><strong>%s</strong> confirmed changes to the following document since you signed off (+%d added / -%d removed):</p>
   <p style="font-size:18px;font-weight:600">%s</p>
+  <ul>%s</ul>
+  %s
   <p>Open the document to re-review and sign off again from the sidebar.</p>
   <p>
     <a href="%s"
@@ -154,9 +170,45 @@ func SendDriftNotification(apiKey, signerEmail, ownerEmail, docTitle, docID stri
   <hr style="margin-top:40px;border:none;border-top:1px solid #e1e4e8">
   <p style="color:#6e7781;font-size:12px">Sent by DocAlign on behalf of %s.</p>
 </body>
-</html>`, ownerName, added, removed, docTitle, docURL, ownerEmail)
+</html>`, ownerName, summary.TotalAdded, summary.TotalRemoved, html.EscapeString(docTitle), sectionHTML.String(), noteHTML, docURL, ownerEmail)
 
 	return resendSend(apiKey, signerEmail, subject, plainText, htmlBody)
+}
+
+// SendOwnerNudge tells the owner a signer is waiting on them to confirm the latest changes.
+func SendOwnerNudge(apiKey, ownerEmail, signerEmail, docTitle, docID string) error {
+	if apiKey == "" {
+		return fmt.Errorf("RESEND_API_KEY not set")
+	}
+
+	signerName := DisplayName(signerEmail)
+	docURL := "https://docs.google.com/document/d/" + docID + "/edit"
+
+	subject := fmt.Sprintf("%s is waiting to sign %q", signerName, docTitle)
+
+	plainText := fmt.Sprintf(
+		"%s wants to sign off on \"%s\", but the document has unconfirmed changes.\n\nOpen the document and confirm the new version from the sidebar so signing can continue:\n%s",
+		signerName, docTitle, docURL,
+	)
+
+	htmlBody := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<body style="font-family:sans-serif;max-width:560px;margin:40px auto;color:#1f2328">
+  <p><strong>%s</strong> wants to sign off on:</p>
+  <p style="font-size:18px;font-weight:600">%s</p>
+  <p>The document has unconfirmed changes. Confirm the new version from the sidebar so signing can continue.</p>
+  <p>
+    <a href="%s"
+       style="display:inline-block;padding:10px 20px;background:#1a73e8;color:#fff;text-decoration:none;border-radius:4px;font-weight:600">
+      Open document
+    </a>
+  </p>
+  <hr style="margin-top:40px;border:none;border-top:1px solid #e1e4e8">
+  <p style="color:#6e7781;font-size:12px">Sent by DocAlign.</p>
+</body>
+</html>`, signerName, html.EscapeString(docTitle), docURL)
+
+	return resendSend(apiKey, ownerEmail, subject, plainText, htmlBody)
 }
 
 // DisplayName extracts a capitalized first name from an email address.

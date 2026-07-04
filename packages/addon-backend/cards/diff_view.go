@@ -8,12 +8,36 @@ type DiffSection struct {
 	Removed int
 }
 
-func DiffView(docID string, added, removed int, sections []DiffSection) Card {
-	summary := fmt.Sprintf("+%d added · -%d removed", added, removed)
+// ChangeSummaryView is the card-layer copy of services.ChangeSummary (cards cannot
+// import services — services already imports cards).
+type ChangeSummaryView struct {
+	Note           string
+	Sections       []DiffSection
+	TotalAdded     int
+	TotalRemoved   int
+	FromRevisionID string
+	ToRevisionID   string
+}
 
-	sectionWidgets := make([]Widget, 0, len(sections))
-	for _, sec := range sections {
-		sectionWidgets = append(sectionWidgets, Widget{
+// VersionHistoryURL builds Google's compare-revisions deep link when both revision IDs
+// are known, falling back to the plain document URL. The showrevision endpoint is
+// undocumented (verified working 2026-07-04 in a signed-in browser); version history is
+// only visible to users with edit access, so this is best-effort on top of the stored
+// summary, never the primary oversight mechanism.
+func VersionHistoryURL(docID, fromRev, toRev string) string {
+	if fromRev != "" && toRev != "" {
+		return fmt.Sprintf("https://docs.google.com/document/showrevision?id=%s&start=%s&end=%s", docID, fromRev, toRev)
+	}
+	return fmt.Sprintf("https://docs.google.com/document/d/%s/edit", docID)
+}
+
+// changeSummaryWidgets renders the stored summary: totals, per-section counts, owner note.
+func changeSummaryWidgets(summary ChangeSummaryView) []Widget {
+	widgets := []Widget{
+		{TextParagraph: &TextParagraph{Text: fmt.Sprintf("+%d added · -%d removed", summary.TotalAdded, summary.TotalRemoved)}},
+	}
+	for _, sec := range summary.Sections {
+		widgets = append(widgets, Widget{
 			DecoratedText: &DecoratedText{
 				Text:        sec.Title,
 				BottomLabel: fmt.Sprintf("+%d added · -%d removed", sec.Added, sec.Removed),
@@ -21,27 +45,30 @@ func DiffView(docID string, added, removed int, sections []DiffSection) Card {
 			},
 		})
 	}
-
-	cardSections := []Section{
-		{
-			Widgets: []Widget{
-				{TextParagraph: &TextParagraph{Text: summary}},
+	if summary.Note != "" {
+		widgets = append(widgets, Widget{
+			DecoratedText: &DecoratedText{
+				TopLabel: "Note from the owner",
+				Text:     summary.Note,
+				WrapText: true,
 			},
-		},
-	}
-	if len(sectionWidgets) > 0 {
-		cardSections = append(cardSections, Section{
-			Header:  "Changed sections",
-			Widgets: sectionWidgets,
 		})
 	}
+	return widgets
+}
 
-	docURL := "https://docs.google.com/document/d/" + docID + "/edit"
+// DiffView renders the stored change summary — no Drive calls, works for every signer
+// including viewers who cannot open Google's version history.
+func DiffView(docID string, summary ChangeSummaryView) Card {
+	cardSections := []Section{
+		{Widgets: changeSummaryWidgets(summary)},
+	}
+
 	cardSections = append(cardSections, Section{
 		Widgets: []Widget{
-			{TextParagraph: &TextParagraph{Text: "For the full line-by-line diff, open the document and check File > Version history."}},
+			{TextParagraph: &TextParagraph{Text: "For the full line-by-line diff, open version history in Google Docs (requires edit access)."}},
 			{ButtonList: &ButtonList{Buttons: []Button{
-				linkButton("Open document", docURL),
+				linkButton("View in Google Docs", VersionHistoryURL(docID, summary.FromRevisionID, summary.ToRevisionID)),
 			}}},
 			{ButtonList: &ButtonList{Buttons: []Button{
 				actionButton("Re-sign", "/addon/sign-form", Parameter{Key: "docId", Value: docID}),
