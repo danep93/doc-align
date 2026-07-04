@@ -100,6 +100,7 @@ func main() {
 	mux.Handle("POST /addon/remove-signer", protected(routes.RemoveSigner(store)))
 	mux.Handle("POST /addon/diff", protected(routes.Diff(store)))
 	mux.Handle("POST /addon/mark-revised", protected(routes.MarkRevised(store, resendKey)))
+	mux.Handle("POST /addon/notify-owner", protected(routes.NotifyOwner(store, resendKey)))
 	mux.Handle("POST /addon/history", protected(routes.History(store)))
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
