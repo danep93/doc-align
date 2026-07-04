@@ -57,11 +57,19 @@ func CreateBaseline(store *services.Store) http.HandlerFunc {
 			}
 		}
 
+		modifiedTime, err := services.FileModifiedTime(ctx, userToken, docID)
+		if err != nil {
+			log.Printf("create-baseline: FileModifiedTime: %v (using now)", err)
+			modifiedTime = time.Now()
+		}
+
 		rec := services.DocRecord{
-			Title:              docTitle,
-			OwnerID:            userEmail,
-			BaselineRevisionID: revID,
-			CreatedAt:          time.Now(),
+			Title:                 docTitle,
+			OwnerID:               userEmail,
+			BaselineRevisionID:    revID,
+			ConfirmedVersion:      1,
+			ConfirmedModifiedTime: modifiedTime,
+			CreatedAt:             time.Now(),
 		}
 		if err := store.CreateDoc(ctx, docID, rec); err != nil {
 			log.Printf("create-baseline: CreateDoc: %v", err)

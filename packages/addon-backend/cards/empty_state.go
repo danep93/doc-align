@@ -3,7 +3,7 @@ package cards
 func EmptyState(isOwner bool, docID string) Card {
 	if isOwner {
 		return Card{
-			Name:   "empty_state",
+			Name: "empty_state",
 			Header: &Header{
 				Title:    "doc-align",
 				Subtitle: "Document alignment for Google Docs",
