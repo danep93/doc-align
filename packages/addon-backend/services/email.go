@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"strings"
@@ -42,7 +43,7 @@ func SendSignoffRequest(apiKey, ownerEmail, docTitle, docID string, signerEmails
     You received this because you were added as a signer on this document.
   </p>
 </body>
-</html>`, ownerName, docTitle, docURL, ownerEmail)
+</html>`, ownerName, html.EscapeString(docTitle), docURL, ownerEmail)
 
 	var errs []string
 	for _, to := range signerEmails {
@@ -119,7 +120,7 @@ func SendSignedNotification(apiKey, ownerEmail, signerEmail, docTitle, docID str
   <hr style="margin-top:40px;border:none;border-top:1px solid #e1e4e8">
   <p style="color:#6e7781;font-size:12px">Sent by DocAlign.</p>
 </body>
-</html>`, signerName, docTitle, docURL)
+</html>`, signerName, html.EscapeString(docTitle), docURL)
 
 	return resendSend(apiKey, ownerEmail, subject, plainText, htmlBody)
 }
@@ -138,13 +139,13 @@ func SendDriftNotification(apiKey, signerEmail, ownerEmail, docTitle, docID stri
 	var sectionHTML strings.Builder
 	for _, s := range summary.Sections {
 		sectionLines.WriteString(fmt.Sprintf("  • %s (+%d / -%d)\n", s.Title, s.Added, s.Removed))
-		sectionHTML.WriteString(fmt.Sprintf("<li>%s <span style=\"color:#6e7781\">(+%d / -%d)</span></li>", s.Title, s.Added, s.Removed))
+		sectionHTML.WriteString(fmt.Sprintf("<li>%s <span style=\"color:#6e7781\">(+%d / -%d)</span></li>", html.EscapeString(s.Title), s.Added, s.Removed))
 	}
 	noteText := ""
 	noteHTML := ""
 	if summary.Note != "" {
 		noteText = fmt.Sprintf("\nNote from %s: %s\n", ownerName, summary.Note)
-		noteHTML = fmt.Sprintf("<p><em>Note from %s:</em> %s</p>", ownerName, summary.Note)
+		noteHTML = fmt.Sprintf("<p><em>Note from %s:</em> %s</p>", ownerName, html.EscapeString(summary.Note))
 	}
 
 	plainText := fmt.Sprintf(
@@ -169,7 +170,7 @@ func SendDriftNotification(apiKey, signerEmail, ownerEmail, docTitle, docID stri
   <hr style="margin-top:40px;border:none;border-top:1px solid #e1e4e8">
   <p style="color:#6e7781;font-size:12px">Sent by DocAlign on behalf of %s.</p>
 </body>
-</html>`, ownerName, summary.TotalAdded, summary.TotalRemoved, docTitle, sectionHTML.String(), noteHTML, docURL, ownerEmail)
+</html>`, ownerName, summary.TotalAdded, summary.TotalRemoved, html.EscapeString(docTitle), sectionHTML.String(), noteHTML, docURL, ownerEmail)
 
 	return resendSend(apiKey, signerEmail, subject, plainText, htmlBody)
 }
@@ -205,7 +206,7 @@ func SendOwnerNudge(apiKey, ownerEmail, signerEmail, docTitle, docID string) err
   <hr style="margin-top:40px;border:none;border-top:1px solid #e1e4e8">
   <p style="color:#6e7781;font-size:12px">Sent by DocAlign.</p>
 </body>
-</html>`, signerName, docTitle, docURL)
+</html>`, signerName, html.EscapeString(docTitle), docURL)
 
 	return resendSend(apiKey, ownerEmail, subject, plainText, htmlBody)
 }
