@@ -25,10 +25,10 @@ func TestDocChanged(t *testing.T) {
 
 func TestSignersToDrift(t *testing.T) {
 	signers := map[string]SignerRecord{
-		"pending@x.com":    {Status: "pending"},
-		"current@x.com":    {Status: "signed", SignedVersion: 2},
-		"old@x.com":        {Status: "signed", SignedVersion: 1},
-		"drifted@x.com":    {Status: "drifted", SignedVersion: 1},
+		"pending@x.com": {Status: "pending"},
+		"current@x.com": {Status: "signed", SignedVersion: 2},
+		"old@x.com":     {Status: "signed", SignedVersion: 1},
+		"drifted@x.com": {Status: "drifted", SignedVersion: 1},
 	}
 
 	// No doc change: only stale signedVersion flips (signer missed the confirm).
