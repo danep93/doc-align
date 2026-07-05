@@ -169,3 +169,109 @@ func (s *Store) ListHistory(ctx context.Context, docID string) ([]HistoryRecord,
 	}
 	return result, nil
 }
+
+// IntegrationConfigRecord stores a user's API key for a third-party integration.
+// Path: integrations/{userEmail}/providers/{provider}
+type IntegrationConfigRecord struct {
+	APIKey      string    `firestore:"apiKey"`
+	ViewerEmail string    `firestore:"viewerEmail"` // verified at connect time
+	ConnectedAt time.Time `firestore:"connectedAt"`
+}
+
+// TicketRecord is a provider-agnostic reference to an external issue.
+// Path: documents/{docID}/tickets/{autoID}
+// The ID field is populated from the Firestore document ID on read; it is not stored.
+type TicketRecord struct {
+	ID          string    `firestore:"-"             json:"id"`
+	Provider    string    `firestore:"provider"      json:"provider"`
+	ExternalID  string    `firestore:"externalId"    json:"externalId"`
+	ExternalURL string    `firestore:"externalUrl"   json:"externalUrl"`
+	Title       string    `firestore:"title"         json:"title"`
+	Description string    `firestore:"description"   json:"description"`
+	TeamID      string    `firestore:"teamId"        json:"teamId"`
+	CreatedBy   string    `firestore:"createdBy"     json:"createdBy"`
+	CreatedAt   time.Time `firestore:"createdAt"     json:"createdAt"`
+	UpdatedAt   time.Time `firestore:"updatedAt"     json:"updatedAt"`
+}
+
+func (s *Store) GetIntegrationConfig(ctx context.Context, userEmail, provider string) (*IntegrationConfigRecord, error) {
+	snap, err := s.client.Collection("integrations").Doc(userEmail).
+		Collection("providers").Doc(provider).Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var rec IntegrationConfigRecord
+	if err := snap.DataTo(&rec); err != nil {
+		return nil, err
+	}
+	return &rec, nil
+}
+
+func (s *Store) SetIntegrationConfig(ctx context.Context, userEmail, provider string, rec IntegrationConfigRecord) error {
+	_, err := s.client.Collection("integrations").Doc(userEmail).
+		Collection("providers").Doc(provider).Set(ctx, rec)
+	return err
+}
+
+func (s *Store) DeleteIntegrationConfig(ctx context.Context, userEmail, provider string) error {
+	_, err := s.client.Collection("integrations").Doc(userEmail).
+		Collection("providers").Doc(provider).Delete(ctx)
+	return err
+}
+
+func (s *Store) CreateTicket(ctx context.Context, docID string, rec TicketRecord) (string, error) {
+	ref, _, err := s.client.Collection("documents").Doc(docID).
+		Collection("tickets").Add(ctx, rec)
+	if err != nil {
+		return "", err
+	}
+	return ref.ID, nil
+}
+
+func (s *Store) GetTicket(ctx context.Context, docID, ticketID string) (*TicketRecord, error) {
+	snap, err := s.client.Collection("documents").Doc(docID).
+		Collection("tickets").Doc(ticketID).Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var rec TicketRecord
+	if err := snap.DataTo(&rec); err != nil {
+		return nil, err
+	}
+	rec.ID = snap.Ref.ID
+	return &rec, nil
+}
+
+func (s *Store) ListTickets(ctx context.Context, docID string) ([]TicketRecord, error) {
+	docs, err := s.client.Collection("documents").Doc(docID).Collection("tickets").
+		OrderBy("createdAt", firestore.Desc).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]TicketRecord, 0, len(docs))
+	for _, d := range docs {
+		var rec TicketRecord
+		if err := d.DataTo(&rec); err != nil {
+			return nil, err
+		}
+		rec.ID = d.Ref.ID
+		result = append(result, rec)
+	}
+	return result, nil
+}
+
+func (s *Store) UpdateTicketFields(ctx context.Context, docID, ticketID string, fields map[string]any) error {
+	updates := make([]firestore.Update, 0, len(fields))
+	for k, v := range fields {
+		updates = append(updates, firestore.Update{Path: k, Value: v})
+	}
+	_, err := s.client.Collection("documents").Doc(docID).
+		Collection("tickets").Doc(ticketID).Update(ctx, updates)
+	return err
+}
+
+func (s *Store) DeleteTicket(ctx context.Context, docID, ticketID string) error {
+	_, err := s.client.Collection("documents").Doc(docID).
+		Collection("tickets").Doc(ticketID).Delete(ctx)
+	return err
+}
