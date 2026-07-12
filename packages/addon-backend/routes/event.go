@@ -92,6 +92,13 @@ func writeErr(w http.ResponseWriter, msg string) {
 	})
 }
 
+// writeRESTErr writes a JSON error response for plain REST endpoints.
+func writeRESTErr(w http.ResponseWriter, msg string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
 // writeActionErr writes an error card wrapped in RenderActions, required for action callbacks.
 func writeActionErr(w http.ResponseWriter, msg string) {
 	writeJSON(w, cards.Push(cards.Card{

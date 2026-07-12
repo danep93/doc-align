@@ -103,6 +103,24 @@ func main() {
 	mux.Handle("POST /addon/notify-owner", protected(routes.NotifyOwner(store, resendKey)))
 	mux.Handle("POST /addon/history", protected(routes.History(store)))
 
+	// REST endpoints use VerifyOIDCREST — email comes from the JWT claim directly,
+	// not from the AddonEvent body, so r.Body is available for JSON decoding.
+	protectedREST := func(h http.HandlerFunc) http.Handler {
+		return middleware.VerifyOIDCREST(h)
+	}
+
+	// Integration config — provider-agnostic; works for any entry in providerFactories.
+	mux.Handle("POST /integrations/{provider}/connect",  protectedREST(routes.IntegrationConnect(store)))
+	mux.Handle("GET /integrations/{provider}/config",    protectedREST(routes.IntegrationGetConfig(store)))
+	mux.Handle("DELETE /integrations/{provider}/config", protectedREST(routes.IntegrationDisconnect(store)))
+
+	// Ticket CRUD — provider is carried in the request body (create) or stored record (update/delete).
+	mux.Handle("POST /docs/{docID}/tickets",              protectedREST(routes.CreateTicket(store)))
+	mux.Handle("GET /docs/{docID}/tickets",               protectedREST(routes.ListTickets(store)))
+	mux.Handle("GET /docs/{docID}/tickets/{ticketID}",    protectedREST(routes.GetTicket(store)))
+	mux.Handle("PATCH /docs/{docID}/tickets/{ticketID}",  protectedREST(routes.UpdateTicket(store)))
+	mux.Handle("DELETE /docs/{docID}/tickets/{ticketID}", protectedREST(routes.DeleteTicket(store)))
+
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})

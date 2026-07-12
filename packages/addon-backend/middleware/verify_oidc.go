@@ -82,6 +82,44 @@ func EmailFromContext(ctx context.Context) string {
 	return v
 }
 
+// VerifyOIDCREST is like VerifyOIDC but for plain REST endpoints that carry no
+// AddonEvent body. The user email is read directly from the OIDC JWT's email
+// claim rather than via a secondary OAuth introspection call, so r.Body is
+// left intact for the downstream handler to decode.
+func VerifyOIDCREST(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if os.Getenv("OIDC_BYPASS") == "true" {
+			email := r.Header.Get("X-Debug-Email")
+			if email == "" {
+				email = os.Getenv("DEBUG_EMAIL")
+			}
+			if email == "" {
+				http.Error(w, "OIDC_BYPASS=true but no X-Debug-Email or DEBUG_EMAIL set", http.StatusUnauthorized)
+				return
+			}
+			ctx := context.WithValue(r.Context(), UserEmailKey, email)
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+
+		authHeader := r.Header.Get("Authorization")
+		if !strings.HasPrefix(authHeader, "Bearer ") {
+			http.Error(w, "missing Bearer token", http.StatusUnauthorized)
+			return
+		}
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+
+		email, err := verifyGoogleJWT(r.Context(), tokenStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid OIDC token: %v", err), http.StatusUnauthorized)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), UserEmailKey, email)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 func fetchEmailFromOAuthToken(ctx context.Context, token string) (string, error) {
 	if token == "" {
 		return "", fmt.Errorf("empty OAuth token in event payload")
