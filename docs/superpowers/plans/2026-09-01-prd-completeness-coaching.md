@@ -665,8 +665,8 @@ git commit -m "feat(addon-backend): add PRD coaching decision logic and Firestor
 - Test: `packages/addon-backend/cards/coaching_test.go`
 
 **Interfaces:**
-- Consumes: `services.PRDCoachingResult` (Task 2).
-- Produces: `cards.PRDCoaching(docTitle, docID string, coaching services.PRDCoachingResult, checkFailed bool) Card` — `Card.Name == "prd_coaching"`. Missing fields render a `TextInput` named `pressReleaseManual` / `dodManual`; found fields render read-only, no input. The submit button posts to `/addon/coach-resolve` with a `docId` parameter.
+- Produces: `cards.PRDCoachingView{PressReleasePresent bool, PressReleaseText string, DoDPresent bool, DoDText string}` (a card-layer copy of the fields of `services.PRDCoachingResult` needed for rendering — **not** `services.PRDCoachingResult` itself: `cards` cannot import `services`, because `services` already imports `cards` for `DiffSection` in `services/drift_detection.go`. This exact problem already has a precedent in this codebase — see `cards/diff_view.go`'s `ChangeSummaryView`, a card-layer copy of `services.ChangeSummary` for the identical reason. `PRDCoachingView` follows that same pattern.), `cards.PRDCoaching(docTitle, docID string, coaching PRDCoachingView, checkFailed bool) Card` — `Card.Name == "prd_coaching"`. Missing fields render a `TextInput` named `pressReleaseManual` / `dodManual`; found fields render read-only, no input. The submit button posts to `/addon/coach-resolve` with a `docId` parameter.
+- Task 4 converts `services.PRDCoachingResult` to `cards.PRDCoachingView` inline before calling `cards.PRDCoaching` (routes freely import both packages — only `cards` importing `services` is the problem).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -677,8 +677,6 @@ package cards
 
 import (
 	"testing"
-
-	"github.com/doc-align/addon-backend/services"
 )
 
 // findTextInput returns the TextInput widget with the given Name, or nil.
@@ -694,9 +692,9 @@ func findTextInput(card Card, name string) *TextInput {
 }
 
 func TestPRDCoaching_BothFound(t *testing.T) {
-	coaching := services.PRDCoachingResult{
-		PressReleasePresent: true, PressReleaseText: "We're building X.", PressReleaseSource: "llm",
-		DoDPresent: true, DoDText: "Demo to 5 customers.", DoDSource: "llm",
+	coaching := PRDCoachingView{
+		PressReleasePresent: true, PressReleaseText: "We're building X.",
+		DoDPresent: true, DoDText: "Demo to 5 customers.",
 	}
 	card := PRDCoaching("My PRD", "doc-1", coaching, false)
 
@@ -712,8 +710,8 @@ func TestPRDCoaching_BothFound(t *testing.T) {
 }
 
 func TestPRDCoaching_OneMissing(t *testing.T) {
-	coaching := services.PRDCoachingResult{
-		PressReleasePresent: true, PressReleaseText: "We're building X.", PressReleaseSource: "llm",
+	coaching := PRDCoachingView{
+		PressReleasePresent: true, PressReleaseText: "We're building X.",
 		DoDPresent: false,
 	}
 	card := PRDCoaching("My PRD", "doc-1", coaching, false)
@@ -731,7 +729,7 @@ func TestPRDCoaching_OneMissing(t *testing.T) {
 }
 
 func TestPRDCoaching_CheckFailed_BothManual(t *testing.T) {
-	card := PRDCoaching("My PRD", "doc-1", services.PRDCoachingResult{}, true)
+	card := PRDCoaching("My PRD", "doc-1", PRDCoachingView{}, true)
 
 	if findTextInput(card, "pressReleaseManual") == nil {
 		t.Error("expected a manual input for press release when the check failed")
@@ -742,7 +740,7 @@ func TestPRDCoaching_CheckFailed_BothManual(t *testing.T) {
 }
 
 func TestPRDCoaching_ContinueButtonPostsWithDocID(t *testing.T) {
-	card := PRDCoaching("My PRD", "doc-1", services.PRDCoachingResult{}, true)
+	card := PRDCoaching("My PRD", "doc-1", PRDCoachingView{}, true)
 
 	var found bool
 	for _, sec := range card.Sections {
@@ -780,14 +778,24 @@ Create `packages/addon-backend/cards/coaching.go`:
 ```go
 package cards
 
-import "github.com/doc-align/addon-backend/services"
+// PRDCoachingView is the card-layer copy of the services.PRDCoachingResult fields
+// needed for rendering (cards cannot import services — services already imports
+// cards for DiffSection in services/drift_detection.go; see ChangeSummaryView in
+// diff_view.go for the identical existing pattern). Callers convert from
+// services.PRDCoachingResult before calling PRDCoaching.
+type PRDCoachingView struct {
+	PressReleasePresent bool
+	PressReleaseText    string
+	DoDPresent          bool
+	DoDText             string
+}
 
 // PRDCoaching shows the result of the pre-signer PRD completeness check. Found
 // fields render read-only; missing fields (or every field, if checkFailed) get
 // an inline text box so the owner can supply them without leaving the sidebar.
 // The owner can also leave a field blank and continue — this is a nudge, not a
 // hard gate.
-func PRDCoaching(docTitle, docID string, coaching services.PRDCoachingResult, checkFailed bool) Card {
+func PRDCoaching(docTitle, docID string, coaching PRDCoachingView, checkFailed bool) Card {
 	var widgets []Widget
 
 	if checkFailed {
@@ -1051,7 +1059,13 @@ func CreateBaseline(store *services.Store, anthropicClient *services.AnthropicCl
 		}
 
 		checkFailed := classifyErr != nil
-		writeJSON(w, cards.Push(cards.PRDCoaching(docTitle, docID, coaching, checkFailed)))
+		view := cards.PRDCoachingView{
+			PressReleasePresent: coaching.PressReleasePresent,
+			PressReleaseText:    coaching.PressReleaseText,
+			DoDPresent:          coaching.DoDPresent,
+			DoDText:             coaching.DoDText,
+		}
+		writeJSON(w, cards.Push(cards.PRDCoaching(docTitle, docID, view, checkFailed)))
 	}
 }
 ```
