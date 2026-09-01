@@ -1,6 +1,8 @@
 # doc-align
 
-Privacy-first Google Workspace Add-on for Google Docs sign-off and alignment. A document owner snapshots a version and requests sign-offs; signers commit to that version; if the doc changes after sign-off, signers are notified and must re-review.
+Google Workspace Add-on for Google Docs sign-off and alignment. A document owner snapshots a version and requests sign-offs; signers commit to that version; if the doc changes after sign-off, signers are notified and must re-review.
+
+**Note on "privacy-first":** earlier versions of this doc framed doc-align as privacy-first above all else. As of 2026-09-01, hitting product goals takes priority over that framing — transient LLM-based analysis of fetched doc content (e.g. for coaching/classification) is acceptable and should not be avoided on privacy grounds alone. The one invariant that still holds is narrower: document content is not *persisted* (see Firestore schema below). Don't assume "privacy-first" blocks a design; ask if it's actually about storage.
 
 **What it is NOT:** not an approval gate (sign-off is tracked, not enforced), not a diff renderer (uses Google's native version history), not a Chrome extension.
 
