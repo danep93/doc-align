@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"time"
@@ -10,7 +11,7 @@ import (
 	"github.com/doc-align/addon-backend/services"
 )
 
-func CreateBaseline(store *services.Store) http.HandlerFunc {
+func CreateBaseline(store *services.Store, anthropicClient *services.AnthropicClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		userEmail := middleware.EmailFromContext(ctx)
@@ -44,6 +45,12 @@ func CreateBaseline(store *services.Store) http.HandlerFunc {
 			return
 		}
 
+		// PRD completeness coaching runs only on genuinely first-time baseline
+		// creation. If a doc record already exists, an owner re-running "Create
+		// baseline" must never re-check or overwrite a coachingResult that may
+		// already hold manually-typed content.
+		isFirstBaseline := doc == nil
+
 		// Mark the current revision as keepForever.
 		revID, err := services.LatestRevisionID(ctx, userToken, docID)
 		if err != nil {
@@ -70,6 +77,13 @@ func CreateBaseline(store *services.Store) http.HandlerFunc {
 			ConfirmedVersion:      1,
 			ConfirmedModifiedTime: modifiedTime,
 			CreatedAt:             time.Now(),
+		}
+		if !isFirstBaseline {
+			// CreateDoc below is a full overwrite (Set, not merge) — this call already
+			// existed before this feature and re-runs the rest of baseline creation too
+			// (out of scope to change here), but it must not silently wipe a coaching
+			// result that was already resolved.
+			rec.CoachingResult = doc.CoachingResult
 		}
 		if err := store.CreateDoc(ctx, docID, rec); err != nil {
 			log.Printf("create-baseline: CreateDoc: %v", err)
@@ -101,6 +115,48 @@ func CreateBaseline(store *services.Store) http.HandlerFunc {
 			}
 		}
 
-		writeJSON(w, cards.Push(cards.AddSigners(collaborators, docID)))
+		if !isFirstBaseline {
+			writeJSON(w, cards.Push(cards.AddSigners(collaborators, docID)))
+			return
+		}
+
+		docText, _, fetchErr := services.FetchDocText(ctx, userToken, docID)
+		var classifyErr error
+		var result *services.PRDCompletenessResult
+		if fetchErr != nil {
+			log.Printf("create-baseline: FetchDocText: %v (coaching check unavailable)", fetchErr)
+			classifyErr = fetchErr
+		} else {
+			llmCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			result, classifyErr = anthropicClient.ClassifyPRDCompleteness(llmCtx, docText)
+			cancel()
+			if classifyErr != nil {
+				log.Printf("create-baseline: ClassifyPRDCompleteness: %v (coaching check unavailable)", classifyErr)
+			}
+		}
+
+		coaching, needsCoaching := services.EvaluateCoaching(result, classifyErr, userEmail)
+		if err := store.UpdateDocFields(ctx, docID, map[string]any{"coachingResult": coaching}); err != nil {
+			log.Printf("create-baseline: UpdateDocFields (coaching): %v (non-fatal)", err)
+		}
+
+		if !needsCoaching {
+			_ = store.AddHistory(ctx, docID, services.HistoryRecord{
+				Action:     "coaching_auto_passed",
+				ActorEmail: userEmail,
+				Timestamp:  time.Now(),
+			})
+			writeJSON(w, cards.Push(cards.AddSigners(collaborators, docID)))
+			return
+		}
+
+		checkFailed := classifyErr != nil
+		view := cards.PRDCoachingView{
+			PressReleasePresent: coaching.PressReleasePresent,
+			PressReleaseText:    coaching.PressReleaseText,
+			DoDPresent:          coaching.DoDPresent,
+			DoDText:             coaching.DoDText,
+		}
+		writeJSON(w, cards.Push(cards.PRDCoaching(docTitle, docID, view, checkFailed)))
 	}
 }
