@@ -8,13 +8,14 @@ import (
 )
 
 type DocRecord struct {
-	Title                 string         `firestore:"title"`
-	OwnerID               string         `firestore:"ownerId"`
-	BaselineRevisionID    string         `firestore:"baselineRevisionId"`
-	ConfirmedVersion      int            `firestore:"confirmedVersion"`
-	ConfirmedModifiedTime time.Time      `firestore:"confirmedModifiedTime"`
-	ChangeSummary         *ChangeSummary `firestore:"changeSummary"`
-	CreatedAt             time.Time      `firestore:"createdAt"`
+	Title                 string              `firestore:"title"`
+	OwnerID               string              `firestore:"ownerId"`
+	BaselineRevisionID    string              `firestore:"baselineRevisionId"`
+	ConfirmedVersion      int                 `firestore:"confirmedVersion"`
+	ConfirmedModifiedTime time.Time           `firestore:"confirmedModifiedTime"`
+	ChangeSummary         *ChangeSummary      `firestore:"changeSummary"`
+	CoachingResult        *PRDCoachingResult  `firestore:"coachingResult"`
+	CreatedAt             time.Time           `firestore:"createdAt"`
 }
 
 // ChangeSummary is the only record of what changed between confirmed versions.
@@ -32,6 +33,22 @@ type ChangeSection struct {
 	Title   string `firestore:"title"`
 	Added   int    `firestore:"added"`
 	Removed int    `firestore:"removed"`
+}
+
+// PRDCoachingResult is the durable, one-time record of the pre-signer PRD
+// completeness check (Press Release + Definition of Done), captured right after
+// baseline creation and before any signers are invited. A later phase (doc ->
+// Linear project conversion, not built yet) reads this as baseline data — see
+// docs/superpowers/specs/2026-09-01-prd-completeness-coaching-design.md.
+type PRDCoachingResult struct {
+	PressReleasePresent bool      `firestore:"pressReleasePresent"`
+	PressReleaseText    string    `firestore:"pressReleaseText"`
+	PressReleaseSource  string    `firestore:"pressReleaseSource"` // "llm" | "manual" | "skipped"
+	DoDPresent          bool      `firestore:"dodPresent"`
+	DoDText             string    `firestore:"dodText"`
+	DoDSource           string    `firestore:"dodSource"` // "llm" | "manual" | "skipped"
+	ResolvedAt          time.Time `firestore:"resolvedAt"`
+	ResolvedBy          string    `firestore:"resolvedBy"`
 }
 
 type SignerRecord struct {
@@ -273,5 +290,15 @@ func (s *Store) UpdateTicketFields(ctx context.Context, docID, ticketID string, 
 func (s *Store) DeleteTicket(ctx context.Context, docID, ticketID string) error {
 	_, err := s.client.Collection("documents").Doc(docID).
 		Collection("tickets").Doc(ticketID).Delete(ctx)
+	return err
+}
+
+// UpdateDocFields patches arbitrary top-level fields on documents/{docID}.
+func (s *Store) UpdateDocFields(ctx context.Context, docID string, fields map[string]any) error {
+	updates := make([]firestore.Update, 0, len(fields))
+	for k, v := range fields {
+		updates = append(updates, firestore.Update{Path: k, Value: v})
+	}
+	_, err := s.client.Collection("documents").Doc(docID).Update(ctx, updates)
 	return err
 }
