@@ -1357,6 +1357,7 @@ func pushedCardName(t *testing.T, resp map[string]any) string {
 }
 
 func TestCoachingE2E_CreateBaseline_ChecksFailGracefully(t *testing.T) {
+	t.Setenv("OIDC_BYPASS", "true")
 	store := newEmulatorStore(t)
 	srv := httptest.NewServer(buildCoachingTestMux(store))
 	t.Cleanup(srv.Close)
@@ -1374,6 +1375,7 @@ func TestCoachingE2E_CreateBaseline_ChecksFailGracefully(t *testing.T) {
 }
 
 func TestCoachingE2E_CreateBaseline_SkipsCoachingOnRerun(t *testing.T) {
+	t.Setenv("OIDC_BYPASS", "true")
 	store := newEmulatorStore(t)
 	srv := httptest.NewServer(buildCoachingTestMux(store))
 	t.Cleanup(srv.Close)
@@ -1412,6 +1414,7 @@ func TestCoachingE2E_CreateBaseline_SkipsCoachingOnRerun(t *testing.T) {
 }
 
 func TestCoachingE2E_CoachResolve_ManualEntryBothFields(t *testing.T) {
+	t.Setenv("OIDC_BYPASS", "true")
 	store := newEmulatorStore(t)
 	srv := httptest.NewServer(buildCoachingTestMux(store))
 	t.Cleanup(srv.Close)
@@ -1447,6 +1450,7 @@ func TestCoachingE2E_CoachResolve_ManualEntryBothFields(t *testing.T) {
 }
 
 func TestCoachingE2E_CoachResolve_BlankFieldIsSkippedNotBlocked(t *testing.T) {
+	t.Setenv("OIDC_BYPASS", "true")
 	store := newEmulatorStore(t)
 	srv := httptest.NewServer(buildCoachingTestMux(store))
 	t.Cleanup(srv.Close)
@@ -1476,6 +1480,7 @@ func TestCoachingE2E_CoachResolve_BlankFieldIsSkippedNotBlocked(t *testing.T) {
 }
 
 func TestCoachingE2E_CoachResolve_NonOwnerRejected(t *testing.T) {
+	t.Setenv("OIDC_BYPASS", "true")
 	store := newEmulatorStore(t)
 	srv := httptest.NewServer(buildCoachingTestMux(store))
 	t.Cleanup(srv.Close)
