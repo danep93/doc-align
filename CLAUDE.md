@@ -36,11 +36,16 @@ packages/addon-backend/
   services/doc_text.go         — Docs API: fetch current text
   services/doc_revisions.go    — Drive Revisions API
   services/drift_detection.go  — LCS diff + section scoring
+  services/anthropic.go        — Anthropic API client (PRD completeness classification)
+  services/prd_coaching.go     — coaching decision logic (EvaluateCoaching)
+  routes/coach_resolve.go      — handles the PRDCoaching card's "Continue" submission
 ```
 
 ### Core user flows
 
-**Owner flow:** Opens sidebar → EmptyState → clicks "Create baseline" (pins current Drive revision) → AddSigners card (enters emails) → StatusOwner card showing `N signed · N drifted · N pending`.
+**Owner flow:** Opens sidebar → EmptyState → clicks "Create baseline" (pins current Drive revision) → a one-time PRD completeness check runs (Claude classifies whether the doc states a Press Release and a Definition of Done) → if anything's missing, `PRDCoaching` card lets the owner fill it in inline or leave it blank and continue; if both are already found, this step is invisible → AddSigners card (enters emails) → StatusOwner card showing `N signed · N drifted · N pending`.
+
+**PRD completeness coaching:** runs exactly once, right after "Create baseline," before any signer is invited — see `docs/superpowers/specs/2026-09-01-prd-completeness-coaching-design.md` for the full design. Never blocks: any failure (missing `ANTHROPIC_API_KEY`, network error, bad response) falls back to manual text entry. Re-running "Create baseline" on a doc that already has a baseline skips the check entirely and never overwrites an already-resolved `coachingResult`.
 
 **Signer flow:** Gets email with doc link → opens sidebar → StatusSigner card → clicks "Sign this doc" → SignForm (optional commit message or quick-sign chip) → signs → status = `signed`.
 
@@ -53,7 +58,8 @@ packages/addon-backend/
 | Card | Shown when |
 |---|---|
 | `EmptyState` | No baseline exists |
-| `AddSigners` | After "Create baseline" clicked |
+| `PRDCoaching` | After "Create baseline" clicked, only if the Press Release and/or Definition of Done check needs the owner's input — skipped entirely if both are already found in the doc |
+| `AddSigners` | After "Create baseline" clicked (coaching auto-passed), or after `PRDCoaching`'s "Continue" |
 | `StatusOwner` | Baseline exists; user is owner |
 | `StatusSigner` | Baseline exists; user is a signer |
 | `SignForm` | Signer clicks "Sign" or "Re-sign" |
@@ -77,9 +83,10 @@ Gmail contextual trigger was removed — the `gmail.addons.current.message.metad
 ```
 config/secrets
   resendApiKey — Resend API key (read by server at startup; env var RESEND_API_KEY overrides)
+  anthropicApiKey — Anthropic API key (read by server at startup; env var ANTHROPIC_API_KEY overrides)
 
 documents/{docId}
-  title, ownerId, baselineRevisionId, confirmedVersion, confirmedModifiedTime, changeSummary {note, sections[], totalAdded, totalRemoved, fromRevisionId, toRevisionId}, createdAt
+  title, ownerId, baselineRevisionId, confirmedVersion, confirmedModifiedTime, changeSummary {note, sections[], totalAdded, totalRemoved, fromRevisionId, toRevisionId}, coachingResult {pressReleasePresent, pressReleaseText, pressReleaseSource, dodPresent, dodText, dodSource, resolvedAt, resolvedBy}, createdAt
 
 documents/{docId}/signers/{email}
   status (pending | signed | drifted), signedAt, signedVersion, commitMessage, notifiedAt
@@ -88,7 +95,7 @@ documents/{docId}/history/{id}
   action, actorEmail, commitMessage, revisionId, timestamp
 ```
 
-Document content is **never stored**. Only revision IDs and metadata.
+Document content is not persisted in full. Firestore stores metadata plus a small set of intentionally-extracted fields: the section-level `changeSummary` (headings + counts + note), and the PRD-completeness `coachingResult` (Press Release / Definition of Done text, each roughly a paragraph). See the privacy-first note above.
 
 ### Critical invariants
 

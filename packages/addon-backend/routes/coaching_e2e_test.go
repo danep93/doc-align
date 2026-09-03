@@ -192,6 +192,46 @@ func TestCoachingE2E_CoachResolve_BlankFieldIsSkippedNotBlocked(t *testing.T) {
 	}
 }
 
+func TestCoachingE2E_CoachResolve_SecondSubmissionPreservesManualSource(t *testing.T) {
+	t.Setenv("OIDC_BYPASS", "true")
+	store := newEmulatorStore(t)
+	srv := httptest.NewServer(buildCoachingTestMux(store))
+	t.Cleanup(srv.Close)
+
+	docID := "coaching-doc-6"
+	// Ensure a clean slate: the Firestore emulator persists data across test
+	// runs (there's no per-test reset), and this test's own doc ID must not
+	// carry over state from a prior run.
+	_, _ = store.FirestoreClient().Collection("documents").Doc(docID).Delete(context.Background())
+
+	do(t, srv, "POST", "/addon/create-baseline", addonEvent(docID, "My PRD", map[string]string{}, nil), "owner@example.com")
+
+	resolveEv := addonEvent(docID, "My PRD", map[string]string{"docId": docID}, map[string][]string{
+		"pressReleaseManual": {"We're building X because Y."},
+		"dodManual":          {"Demo to 5 customers."},
+	})
+	first := do(t, srv, "POST", "/addon/coach-resolve", resolveEv, "owner@example.com")
+	assertStatus(t, first, http.StatusOK)
+	readJSON(t, first) // drain
+
+	// Simulate the owner navigating back to the still-live PRDCoaching card
+	// (cards.Push leaves it on the nav stack) and clicking Continue again.
+	second := do(t, srv, "POST", "/addon/coach-resolve", resolveEv, "owner@example.com")
+	assertStatus(t, second, http.StatusOK)
+	readJSON(t, second) // drain
+
+	doc, err := store.GetDoc(context.Background(), docID)
+	if err != nil {
+		t.Fatalf("GetDoc: %v", err)
+	}
+	if doc.CoachingResult.PressReleaseSource != "manual" {
+		t.Errorf("PressReleaseSource: got %q after second submission, want \"manual\" (must not be silently relabeled \"llm\")", doc.CoachingResult.PressReleaseSource)
+	}
+	if doc.CoachingResult.DoDSource != "manual" {
+		t.Errorf("DoDSource: got %q after second submission, want \"manual\"", doc.CoachingResult.DoDSource)
+	}
+}
+
 func TestCoachingE2E_CoachResolve_NonOwnerRejected(t *testing.T) {
 	store := newEmulatorStore(t)
 	t.Setenv("OIDC_BYPASS", "true")

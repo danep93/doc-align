@@ -51,7 +51,10 @@ func CoachResolve(store *services.Store) http.HandlerFunc {
 		if doc.CoachingResult != nil && doc.CoachingResult.PressReleasePresent {
 			final.PressReleasePresent = true
 			final.PressReleaseText = doc.CoachingResult.PressReleaseText
-			final.PressReleaseSource = "llm"
+			final.PressReleaseSource = doc.CoachingResult.PressReleaseSource
+			if final.PressReleaseSource == "" {
+				final.PressReleaseSource = "llm"
+			}
 		} else if manual := strings.TrimSpace(ev.formString("pressReleaseManual")); manual != "" {
 			final.PressReleasePresent = true
 			final.PressReleaseText = manual
@@ -63,7 +66,10 @@ func CoachResolve(store *services.Store) http.HandlerFunc {
 		if doc.CoachingResult != nil && doc.CoachingResult.DoDPresent {
 			final.DoDPresent = true
 			final.DoDText = doc.CoachingResult.DoDText
-			final.DoDSource = "llm"
+			final.DoDSource = doc.CoachingResult.DoDSource
+			if final.DoDSource == "" {
+				final.DoDSource = "llm"
+			}
 		} else if manual := strings.TrimSpace(ev.formString("dodManual")); manual != "" {
 			final.DoDPresent = true
 			final.DoDText = manual
