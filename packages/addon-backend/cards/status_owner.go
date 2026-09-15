@@ -15,11 +15,12 @@ type SignerStatus struct {
 	NotifiedAt      time.Time
 }
 
-func StatusOwner(docTitle string, signers []SignerStatus, docID string, docChanged bool) Card {
+func StatusOwner(docTitle string, signers []SignerStatus, docID string, docChanged bool, ownerEmail string) Card {
 	signed := 0
 	drifted := 0
 	pending := 0
-	for _, s := range signers {
+	var ownerStatus *SignerStatus
+	for i, s := range signers {
 		switch s.Status {
 		case "signed":
 			signed++
@@ -27,6 +28,9 @@ func StatusOwner(docTitle string, signers []SignerStatus, docID string, docChang
 			drifted++
 		default:
 			pending++
+		}
+		if s.Email == ownerEmail {
+			ownerStatus = &signers[i]
 		}
 	}
 
@@ -55,32 +59,37 @@ func StatusOwner(docTitle string, signers []SignerStatus, docID string, docChang
 		if label == "" {
 			label = s.Email
 		}
+		if s.Email == ownerEmail {
+			label += " (you)"
+		}
 		bottom := s.Status
 		if rt := relativeTime(s.StatusAt); rt != "" {
 			bottom += " · " + rt
 		}
-		w := Widget{
-			DecoratedText: &DecoratedText{
-				StartIcon:   icon,
-				Text:        label,
-				BottomLabel: bottom,
-				WrapText:    true,
-				Button: &Button{
-					Icon: &Icon{MaterialIcon: &MaterialIcon{Name: "person_remove"}, AltText: "Remove signer"},
-					Type: "BORDERLESS",
-					OnClick: &OnClick{
-						Action: &FormAction{
-							Function: BaseURL + "/addon/remove-signer",
-							Parameters: []Parameter{
-								{Key: "signerEmail", Value: s.Email},
-								{Key: "docId", Value: docID},
-							},
+		dt := &DecoratedText{
+			StartIcon:   icon,
+			Text:        label,
+			BottomLabel: bottom,
+			WrapText:    true,
+		}
+		// Removing yourself as owner doesn't make sense — only show the button on
+		// rows for signers you invited.
+		if s.Email != ownerEmail {
+			dt.Button = &Button{
+				Icon: &Icon{MaterialIcon: &MaterialIcon{Name: "person_remove"}, AltText: "Remove signer"},
+				Type: "BORDERLESS",
+				OnClick: &OnClick{
+					Action: &FormAction{
+						Function: BaseURL + "/addon/remove-signer",
+						Parameters: []Parameter{
+							{Key: "signerEmail", Value: s.Email},
+							{Key: "docId", Value: docID},
 						},
 					},
 				},
-			},
+			}
 		}
-		signerWidgets = append(signerWidgets, w)
+		signerWidgets = append(signerWidgets, Widget{DecoratedText: dt})
 	}
 
 	if len(signerWidgets) == 0 {
@@ -101,6 +110,18 @@ func StatusOwner(docTitle string, signers []SignerStatus, docID string, docChang
 			Parameter{Key: "docId", Value: docID}),
 		outlinedActionButton("History", "/addon/history",
 			Parameter{Key: "docId", Value: docID}),
+	}
+	// Owners can sign their own doc too. Hidden while there's unconfirmed drift —
+	// same gate everyone else's signing is already held to.
+	if !docChanged && ownerStatus != nil {
+		switch ownerStatus.Status {
+		case "pending":
+			bottomButtons = append([]Button{filledActionButton("Sign this document", "/addon/sign-form",
+				Parameter{Key: "docId", Value: docID})}, bottomButtons...)
+		case "drifted":
+			bottomButtons = append([]Button{filledActionButton("Re-sign", "/addon/sign-form",
+				Parameter{Key: "docId", Value: docID})}, bottomButtons...)
+		}
 	}
 	sections := []Section{
 		{

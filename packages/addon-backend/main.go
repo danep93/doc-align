@@ -89,6 +89,7 @@ func main() {
 	}
 
 	mux.Handle("POST /addon/homepage", protected(routes.Homepage(store)))
+	mux.Handle("POST /addon/back-to-status", protected(routes.BackToStatus(store)))
 	mux.Handle("POST /addon/request-file-scope", protected(routes.RequestFileScope()))
 	mux.Handle("POST /addon/on-file-scope-granted", protected(routes.OnFileScopeGranted(store)))
 	mux.Handle("POST /addon/create-baseline", protected(routes.CreateBaseline(store)))

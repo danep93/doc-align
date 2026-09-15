@@ -6,9 +6,11 @@
 package routes_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/doc-align/addon-backend/middleware"
 	"github.com/doc-align/addon-backend/routes"
@@ -87,5 +89,58 @@ func TestCreateBaseline_RerunAlsoGoesStraightToAddSigners(t *testing.T) {
 
 	if name := pushedCardName(t, body); name != "add_signers" {
 		t.Fatalf("re-running create-baseline should still go straight to add_signers, got %q", name)
+	}
+}
+
+func TestCreateBaseline_AddsOwnerAsPendingSigner(t *testing.T) {
+	t.Setenv("OIDC_BYPASS", "true")
+	store := newEmulatorStore(t)
+	srv := httptest.NewServer(buildCreateBaselineTestMux(store))
+	t.Cleanup(srv.Close)
+
+	docID := "create-baseline-doc-owner-signer"
+	resp := do(t, srv, "POST", "/addon/create-baseline", createBaselineEvent(docID, "My Doc"), "owner@example.com")
+	assertStatus(t, resp, http.StatusOK)
+	readJSON(t, resp) // drain
+
+	signer, err := store.GetSigner(context.Background(), docID, "owner@example.com")
+	if err != nil {
+		t.Fatalf("expected the owner to have a signer record after create-baseline, GetSigner: %v", err)
+	}
+	if signer.Status != "pending" {
+		t.Errorf("expected owner's signer status to be %q, got %q", "pending", signer.Status)
+	}
+}
+
+func TestCreateBaseline_RerunDoesNotResetOwnerAlreadySigned(t *testing.T) {
+	t.Setenv("OIDC_BYPASS", "true")
+	store := newEmulatorStore(t)
+	srv := httptest.NewServer(buildCreateBaselineTestMux(store))
+	t.Cleanup(srv.Close)
+
+	docID := "create-baseline-doc-owner-rerun"
+	ev := createBaselineEvent(docID, "My Doc")
+
+	first := do(t, srv, "POST", "/addon/create-baseline", ev, "owner@example.com")
+	assertStatus(t, first, http.StatusOK)
+	readJSON(t, first) // drain
+
+	// Simulate the owner having already signed before the baseline is re-created.
+	if err := store.UpdateSignerStatus(context.Background(), docID, "owner@example.com", "signed", map[string]interface{}{
+		"signedAt": time.Now(),
+	}); err != nil {
+		t.Fatalf("UpdateSignerStatus: %v", err)
+	}
+
+	second := do(t, srv, "POST", "/addon/create-baseline", ev, "owner@example.com")
+	assertStatus(t, second, http.StatusOK)
+	readJSON(t, second) // drain
+
+	signer, err := store.GetSigner(context.Background(), docID, "owner@example.com")
+	if err != nil {
+		t.Fatalf("GetSigner: %v", err)
+	}
+	if signer.Status != "signed" {
+		t.Errorf("re-running create-baseline must not reset an already-signed owner back to pending, got status %q", signer.Status)
 	}
 }

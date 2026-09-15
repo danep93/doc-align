@@ -14,7 +14,7 @@ func SignForm(docTitle, ownerName string, docID string) Card {
 		{
 			ButtonList: &ButtonList{Buttons: []Button{
 				filledActionButton("Sign", "/addon/sign", Parameter{Key: "docId", Value: docID}),
-				outlinedActionButton("Cancel", "/addon/homepage"),
+				outlinedActionButton("Cancel", "/addon/back-to-status", Parameter{Key: "docId", Value: docID}),
 			}},
 		},
 	}

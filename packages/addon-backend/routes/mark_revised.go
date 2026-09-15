@@ -120,8 +120,12 @@ func MarkRevised(store *services.Store, resendKey string) http.HandlerFunc {
 				rec.Status = "drifted"
 				rec.DriftDetectedAt = now
 			}
-			if err := services.SendDriftNotification(resendKey, email, userEmail, doc.Title, docID, summary); err != nil {
-				log.Printf("mark-revised: SendDriftNotification %s: %v", email, err)
+			// Don't email the owner about their own document changing — they're the
+			// one who just confirmed it.
+			if email != doc.OwnerID {
+				if err := services.SendDriftNotification(resendKey, email, userEmail, doc.Title, docID, summary); err != nil {
+					log.Printf("mark-revised: SendDriftNotification %s: %v", email, err)
+				}
 			}
 			if err := store.UpdateSignerStatus(ctx, docID, email, rec.Status, map[string]interface{}{
 				"notifiedAt": now,
@@ -132,6 +136,6 @@ func MarkRevised(store *services.Store, resendKey string) http.HandlerFunc {
 			signerMap[email] = rec
 		}
 
-		writeJSON(w, cards.Update(cards.StatusOwner(doc.Title, toSignerStatusList(signerMap), docID, false)))
+		writeJSON(w, cards.Update(cards.StatusOwner(doc.Title, toSignerStatusList(signerMap), docID, false, doc.OwnerID)))
 	}
 }

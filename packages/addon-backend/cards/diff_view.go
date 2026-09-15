@@ -72,7 +72,7 @@ func DiffView(docID string, summary ChangeSummaryView) Card {
 			}}},
 			{ButtonList: &ButtonList{Buttons: []Button{
 				actionButton("Re-sign", "/addon/sign-form", Parameter{Key: "docId", Value: docID}),
-				actionButton("Back", "/addon/homepage"),
+				actionButton("Back", "/addon/back-to-status", Parameter{Key: "docId", Value: docID}),
 			}}},
 		},
 	})

@@ -32,6 +32,10 @@ func RemoveSigner(store *services.Store) http.HandlerFunc {
 			writeActionErr(w, "Only the document owner can remove signers.")
 			return
 		}
+		if signerEmail == doc.OwnerID {
+			writeActionErr(w, "The document owner can't be removed as a signer.")
+			return
+		}
 
 		if err := store.DeleteSigner(ctx, docID, signerEmail); err != nil {
 			log.Printf("remove-signer: DeleteSigner %s: %v", signerEmail, err)
@@ -43,6 +47,6 @@ func RemoveSigner(store *services.Store) http.HandlerFunc {
 		userToken := ev.AuthorizationEventObject.UserOAuthToken
 		docChanged, signerMap := services.CheckDocDrift(ctx, store, userToken, docID, doc, signerMap)
 		signerStatuses := toSignerStatusList(signerMap)
-		writeJSON(w, cards.Update(cards.StatusOwner(doc.Title, signerStatuses, docID, docChanged)))
+		writeJSON(w, cards.Update(cards.StatusOwner(doc.Title, signerStatuses, docID, docChanged, doc.OwnerID)))
 	}
 }

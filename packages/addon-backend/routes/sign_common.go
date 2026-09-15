@@ -56,13 +56,22 @@ func completeSign(w http.ResponseWriter, r *http.Request, store *services.Store,
 		Timestamp:     now,
 	})
 
-	go func() {
-		if err := services.SendSignedNotification(resendKey, doc.OwnerID, userEmail, doc.Title, docID); err != nil {
-			log.Printf("sign: SendSignedNotification: %v", err)
-		}
-	}()
+	isOwner := userEmail == doc.OwnerID
+
+	// Don't email the owner that they signed their own document.
+	if !isOwner {
+		go func() {
+			if err := services.SendSignedNotification(resendKey, doc.OwnerID, userEmail, doc.Title, docID); err != nil {
+				log.Printf("sign: SendSignedNotification: %v", err)
+			}
+		}()
+	}
 
 	signerMap, _ := store.ListSigners(ctx, docID)
+	if isOwner {
+		writeJSON(w, cards.Push(cards.StatusOwner(doc.Title, toSignerStatusList(signerMap), docID, false, doc.OwnerID)))
+		return
+	}
 	ownerName := services.DisplayName(doc.OwnerID)
 	writeJSON(w, cards.Push(cards.StatusSigner(doc.Title, ownerName, toSignerStatusList(signerMap), userEmail, docID, false, summaryToView(doc.ChangeSummary))))
 }

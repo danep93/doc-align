@@ -40,9 +40,11 @@ packages/addon-backend/
 
 ### Core user flows
 
-**Owner flow:** Opens sidebar → EmptyState → clicks "Create baseline" (pins current Drive revision) → AddSigners card (enters emails) → StatusOwner card showing `N signed · N drifted · N pending`.
+**Owner flow:** Opens sidebar → EmptyState → clicks "Create baseline" (pins current Drive revision) → AddSigners card (enters emails) → StatusOwner card showing `N signed · N drifted · N pending`. The owner is added as a signer on their own doc too (a `pending` signer record created alongside the doc record on first baseline creation) — they appear in the same signer list as everyone they invite, with a "Sign this document" / "Re-sign" button on StatusOwner itself, using the same SignForm/Sign flow as any other signer.
 
-**Signer flow:** Gets email with doc link → opens sidebar → StatusSigner card → clicks "Sign this doc" → SignForm (optional commit message) → signs → status = `signed`.
+**Signer flow:** Gets email with doc link → opens sidebar → StatusSigner card → clicks "Sign this doc" → SignForm (optional commit message) → signs → status = `signed`. Same flow for the owner signing their own doc, except signing routes back to StatusOwner instead of StatusSigner.
+
+**Returning to the status view:** `SignForm`'s Cancel, `DiffView`'s Back, and `AddSigners`'s Cancel all hit `/addon/back-to-status` — a dedicated action route sharing `resolveStatusCard` with the homepage trigger. Don't point a "back"/"cancel" button at `/addon/homepage` directly: that handler reads `docs.id` (only populated on the real trigger event, not action-callback events) and returns a bare `Card`, which is the wrong response shape for an action callback (see Critical invariants below).
 
 **Drift + re-review:** Owner reopens sidebar → lazy doc-level drift check runs (compares current `modifiedTime` against the doc's `confirmedModifiedTime`) → if changed, **everyone is locked** — no one can sign until the owner acts. Owner sees "Confirm new version", optionally adds a note, and confirms → server diffs the pinned baseline against current text using the owner's live token, stores the section-level `changeSummary` (headings + counts + note, never document text), bumps `confirmedVersion`, pins a new baseline, and emails drifted signers. Signers whose `signedVersion` is behind `confirmedVersion` see the drift summary and must re-sign; they can also nudge the owner via "Notify owner" if they spot drift before the owner does.
 

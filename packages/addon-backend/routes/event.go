@@ -80,16 +80,22 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 	json.NewEncoder(w).Encode(v)
 }
 
-// writeErr writes a bare Card error. Use only for homepage triggers.
-func writeErr(w http.ResponseWriter, msg string) {
-	writeJSON(w, cards.Card{
+// errorCard builds a bare error Card. Callers decide whether it needs cards.Push
+// wrapping (action callbacks) or not (homepage-style triggers).
+func errorCard(msg string) cards.Card {
+	return cards.Card{
 		Name: "error",
 		Sections: []cards.Section{
 			{Widgets: []cards.Widget{
 				{TextParagraph: &cards.TextParagraph{Text: msg}},
 			}},
 		},
-	})
+	}
+}
+
+// writeErr writes a bare Card error. Use only for homepage triggers.
+func writeErr(w http.ResponseWriter, msg string) {
+	writeJSON(w, errorCard(msg))
 }
 
 // writeRESTErr writes a JSON error response for plain REST endpoints.
@@ -101,14 +107,7 @@ func writeRESTErr(w http.ResponseWriter, msg string, code int) {
 
 // writeActionErr writes an error card wrapped in RenderActions, required for action callbacks.
 func writeActionErr(w http.ResponseWriter, msg string) {
-	writeJSON(w, cards.Push(cards.Card{
-		Name: "error",
-		Sections: []cards.Section{
-			{Widgets: []cards.Widget{
-				{TextParagraph: &cards.TextParagraph{Text: msg}},
-			}},
-		},
-	}))
+	writeJSON(w, cards.Push(errorCard(msg)))
 }
 
 // hasScope reports whether scope is present in the event's authorizedScopes list.
