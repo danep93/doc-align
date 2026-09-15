@@ -2,7 +2,7 @@
 
 Google Workspace Add-on for Google Docs sign-off and alignment. A document owner snapshots a version and requests sign-offs; signers commit to that version; if the doc changes after sign-off, signers are notified and must re-review.
 
-**Note on "privacy-first":** earlier versions of this doc framed doc-align as privacy-first above all else. As of 2026-09-01, hitting product goals takes priority over that framing — transient LLM-based analysis of fetched doc content (e.g. for coaching/classification) is acceptable and should not be avoided on privacy grounds alone. Full document text is still never persisted, but **extracted/derived content will need to be stored going forward** — e.g. the PRD-completeness coaching fields (Press Release, Definition of Done text), and later, whatever baseline fields get carried into a converted Linear project so that drift can be tracked against them (comparing what the Linear project turned into versus what the doc originally said, to surface inaccuracy or scope drift). Don't assume "never store anything derived from doc content" — the constraint is against storing full raw document text, not against storing the specific fields a feature is built to track.
+**Note on "privacy-first":** earlier versions of this doc framed doc-align as privacy-first above all else. As of 2026-09-01, hitting product goals takes priority over that framing — transient LLM-based analysis of fetched doc content (e.g. for coaching/classification) is acceptable and should not be avoided on privacy grounds alone. Full document text is still never persisted, but **extracted/derived content will need to be stored going forward** — e.g. the section-level `changeSummary` already stores headings and counts, and later, whatever baseline fields get carried into a converted Linear project so that drift can be tracked against them (comparing what the Linear project turned into versus what the doc originally said, to surface inaccuracy or scope drift). Don't assume "never store anything derived from doc content" — the constraint is against storing full raw document text, not against storing the specific fields a feature is built to track.
 
 **What it is NOT:** not an approval gate (sign-off is tracked, not enforced), not a diff renderer (uses Google's native version history), not a Chrome extension.
 
@@ -36,16 +36,11 @@ packages/addon-backend/
   services/doc_text.go         — Docs API: fetch current text
   services/doc_revisions.go    — Drive Revisions API
   services/drift_detection.go  — LCS diff + section scoring
-  services/anthropic.go        — Anthropic API client (PRD completeness classification)
-  services/prd_coaching.go     — coaching decision logic (EvaluateCoaching)
-  routes/coach_resolve.go      — handles the PRDCoaching card's "Continue" submission
 ```
 
 ### Core user flows
 
-**Owner flow:** Opens sidebar → EmptyState → clicks "Create baseline" (pins current Drive revision) → a one-time PRD completeness check runs (Claude classifies whether the doc states a Press Release and a Definition of Done) → if anything's missing, `PRDCoaching` card lets the owner fill it in inline or leave it blank and continue; if both are already found, this step is invisible → AddSigners card (enters emails) → StatusOwner card showing `N signed · N drifted · N pending`.
-
-**PRD completeness coaching:** runs exactly once, right after "Create baseline," before any signer is invited — see `docs/superpowers/specs/2026-09-01-prd-completeness-coaching-design.md` for the full design. Never blocks: any failure (missing `ANTHROPIC_API_KEY`, network error, bad response) falls back to manual text entry. Re-running "Create baseline" on a doc that already has a baseline skips the check entirely and never overwrites an already-resolved `coachingResult`.
+**Owner flow:** Opens sidebar → EmptyState → clicks "Create baseline" (pins current Drive revision) → AddSigners card (enters emails) → StatusOwner card showing `N signed · N drifted · N pending`.
 
 **Signer flow:** Gets email with doc link → opens sidebar → StatusSigner card → clicks "Sign this doc" → SignForm (optional commit message or quick-sign chip) → signs → status = `signed`.
 
@@ -58,8 +53,7 @@ packages/addon-backend/
 | Card | Shown when |
 |---|---|
 | `EmptyState` | No baseline exists |
-| `PRDCoaching` | After "Create baseline" clicked, only if the Press Release and/or Definition of Done check needs the owner's input — skipped entirely if both are already found in the doc |
-| `AddSigners` | After "Create baseline" clicked (coaching auto-passed), or after `PRDCoaching`'s "Continue" |
+| `AddSigners` | After "Create baseline" clicked |
 | `StatusOwner` | Baseline exists; user is owner |
 | `StatusSigner` | Baseline exists; user is a signer |
 | `SignForm` | Signer clicks "Sign" or "Re-sign" |
@@ -83,10 +77,9 @@ Gmail contextual trigger was removed — the `gmail.addons.current.message.metad
 ```
 config/secrets
   resendApiKey — Resend API key (read by server at startup; env var RESEND_API_KEY overrides)
-  anthropicApiKey — Anthropic API key (read by server at startup; env var ANTHROPIC_API_KEY overrides)
 
 documents/{docId}
-  title, ownerId, baselineRevisionId, confirmedVersion, confirmedModifiedTime, changeSummary {note, sections[], totalAdded, totalRemoved, fromRevisionId, toRevisionId}, coachingResult {pressReleasePresent, pressReleaseText, pressReleaseSource, dodPresent, dodText, dodSource, resolvedAt, resolvedBy}, createdAt
+  title, ownerId, baselineRevisionId, confirmedVersion, confirmedModifiedTime, changeSummary {note, sections[], totalAdded, totalRemoved, fromRevisionId, toRevisionId}, createdAt
 
 documents/{docId}/signers/{email}
   status (pending | signed | drifted), signedAt, signedVersion, commitMessage, notifiedAt
@@ -95,7 +88,7 @@ documents/{docId}/history/{id}
   action, actorEmail, commitMessage, revisionId, timestamp
 ```
 
-Document content is not persisted in full. Firestore stores metadata plus a small set of intentionally-extracted fields: the section-level `changeSummary` (headings + counts + note), and the PRD-completeness `coachingResult` (Press Release / Definition of Done text, each roughly a paragraph). See the privacy-first note above.
+Document content is not persisted in full. Firestore stores metadata plus a small set of intentionally-extracted fields: the section-level `changeSummary` (headings + counts + note). See the privacy-first note above.
 
 ### Critical invariants
 

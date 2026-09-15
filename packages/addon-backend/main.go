@@ -79,21 +79,6 @@ func main() {
 		log.Println("RESEND_API_KEY not found in env or Firestore config — sign-off emails will not be sent")
 	}
 
-	// ANTHROPIC_API_KEY: env var takes precedence; fall back to Firestore config/secrets.
-	anthropicKey := os.Getenv("ANTHROPIC_API_KEY")
-	if anthropicKey == "" {
-		snap, err := fsClient.Collection("config").Doc("secrets").Get(ctx)
-		if err == nil {
-			if v, ok := snap.Data()["anthropicApiKey"].(string); ok {
-				anthropicKey = v
-			}
-		}
-	}
-	if anthropicKey == "" {
-		log.Println("ANTHROPIC_API_KEY not found in env or Firestore config — PRD completeness coaching will fall back to manual entry")
-	}
-	anthropicClient := services.NewAnthropicClient(anthropicKey)
-
 	store := services.NewStore(fsClient)
 
 	mux := http.NewServeMux()
@@ -106,9 +91,8 @@ func main() {
 	mux.Handle("POST /addon/homepage", protected(routes.Homepage(store)))
 	mux.Handle("POST /addon/request-file-scope", protected(routes.RequestFileScope()))
 	mux.Handle("POST /addon/on-file-scope-granted", protected(routes.OnFileScopeGranted(store)))
-	mux.Handle("POST /addon/create-baseline", protected(routes.CreateBaseline(store, anthropicClient)))
+	mux.Handle("POST /addon/create-baseline", protected(routes.CreateBaseline(store)))
 	mux.Handle("POST /addon/add-signers", protected(routes.AddSigners(store)))
-	mux.Handle("POST /addon/coach-resolve", protected(routes.CoachResolve(store)))
 	mux.Handle("POST /addon/save-signers", protected(routes.SaveSigners(store, resendKey)))
 	mux.Handle("POST /addon/sign-form", protected(routes.SignForm(store)))
 	mux.Handle("POST /addon/sign", protected(routes.Sign(store, resendKey)))
