@@ -35,12 +35,12 @@ type ChangeSection struct {
 }
 
 type SignerRecord struct {
-	Status          string    `firestore:"status"` // pending | signed | drifted
-	SignedAt        time.Time `firestore:"signedAt"`
-	SignedVersion   int       `firestore:"signedVersion"`
-	CommitMessage   string    `firestore:"commitMessage"`
-	DriftDetectedAt time.Time `firestore:"driftDetectedAt"`
-	NotifiedAt      time.Time `firestore:"notifiedAt"`
+	Status             string    `firestore:"status"` // pending | signed | drifted
+	SignedAt           time.Time `firestore:"signedAt"`
+	SignedModifiedTime time.Time `firestore:"signedModifiedTime"`
+	CommitMessage      string    `firestore:"commitMessage"`
+	DriftDetectedAt    time.Time `firestore:"driftDetectedAt"`
+	NotifiedAt         time.Time `firestore:"notifiedAt"`
 }
 
 type HistoryRecord struct {
@@ -139,12 +139,15 @@ func (s *Store) DeleteSigner(ctx context.Context, docID, email string) error {
 	return err
 }
 
+// UpdateSignerStatus upserts (Set + MergeAll rather than Update) so it works whether
+// or not a signer record already exists — the document owner may sign before ever
+// having a pre-existing "pending" record depending on when they were added.
 func (s *Store) UpdateSignerStatus(ctx context.Context, docID, email, status string, updates map[string]interface{}) error {
-	up := []firestore.Update{{Path: "status", Value: status}}
+	data := map[string]interface{}{"status": status}
 	for k, v := range updates {
-		up = append(up, firestore.Update{Path: k, Value: v})
+		data[k] = v
 	}
-	_, err := s.client.Collection("documents").Doc(docID).Collection("signers").Doc(email).Update(ctx, up)
+	_, err := s.client.Collection("documents").Doc(docID).Collection("signers").Doc(email).Set(ctx, data, firestore.MergeAll)
 	return err
 }
 

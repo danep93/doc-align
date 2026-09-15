@@ -24,29 +24,34 @@ func TestDocChanged(t *testing.T) {
 }
 
 func TestSignersToDrift(t *testing.T) {
+	base := time.Date(2026, 7, 4, 12, 0, 0, 0, time.UTC)
 	signers := map[string]SignerRecord{
 		"pending@x.com": {Status: "pending"},
-		"current@x.com": {Status: "signed", SignedVersion: 2},
-		"old@x.com":     {Status: "signed", SignedVersion: 1},
-		"drifted@x.com": {Status: "drifted", SignedVersion: 1},
+		"current@x.com": {Status: "signed", SignedModifiedTime: base.Add(time.Hour)},
+		"old@x.com":     {Status: "signed", SignedModifiedTime: base.Add(-time.Hour)},
+		"drifted@x.com": {Status: "drifted", SignedModifiedTime: base.Add(-time.Hour)},
 	}
 
-	// No doc change: only stale signedVersion flips (signer missed the confirm).
-	got := SignersToDrift(false, 2, signers)
+	// Live modifiedTime sits between old@x.com's and current@x.com's own signed
+	// times: only old@x.com (signed before this edit) should flip. current@x.com
+	// signed after this edit, so their signature is still fresh — independent of
+	// old@x.com's state.
+	got := SignersToDrift(base, signers)
 	if len(got) != 1 || got[0] != "old@x.com" {
-		t.Errorf("no-change case: want [old@x.com], got %v", got)
+		t.Errorf("want [old@x.com], got %v", got)
 	}
 
-	// Doc changed: every currently-signed signer flips; drifted/pending untouched.
-	got = SignersToDrift(true, 2, signers)
+	// A later live modifiedTime invalidates every currently-signed signer
+	// independently — pending/drifted are never returned.
+	got = SignersToDrift(base.Add(2*time.Hour), signers)
 	if len(got) != 2 {
-		t.Errorf("changed case: want 2 signers, got %v", got)
+		t.Errorf("want 2 signers, got %v", got)
 	}
 	found := map[string]bool{}
 	for _, e := range got {
 		found[e] = true
 	}
 	if !found["current@x.com"] || !found["old@x.com"] {
-		t.Errorf("changed case: want current@x.com and old@x.com, got %v", got)
+		t.Errorf("want current@x.com and old@x.com, got %v", got)
 	}
 }
