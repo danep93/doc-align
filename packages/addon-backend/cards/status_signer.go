@@ -2,7 +2,7 @@ package cards
 
 import "fmt"
 
-func StatusSigner(docTitle, ownerName string, signers []SignerStatus, currentUserEmail string, docID string, docChanged bool, summary *ChangeSummaryView) Card {
+func StatusSigner(docTitle, ownerName string, signers []SignerStatus, currentUserEmail string, docID string, ownerHasSignedOnce bool, summary *ChangeSummaryView) Card {
 	sorted := make([]SignerStatus, 0, len(signers))
 	for _, s := range signers {
 		if s.Status == "drifted" {
@@ -28,8 +28,8 @@ func StatusSigner(docTitle, ownerName string, signers []SignerStatus, currentUse
 			label = s.DisplayName
 		}
 		bottom := s.Status
-		if !s.StatusAt.IsZero() {
-			bottom += " · " + relativeTime(s.StatusAt)
+		if rt := relativeTime(staleTimestamp(s)); rt != "" {
+			bottom += " · " + rt
 		}
 		signerWidgets = append(signerWidgets, Widget{
 			DecoratedText: &DecoratedText{
@@ -56,48 +56,51 @@ func StatusSigner(docTitle, ownerName string, signers []SignerStatus, currentUse
 		},
 	}
 
-	if docChanged {
-		// Unconfirmed changes lock EVERYONE — pending and drifted alike. Nobody signs
-		// off on a version the owner hasn't confirmed.
+	switch {
+	case current.Status == "pending" && !ownerHasSignedOnce:
 		sections = append(sections, Section{
 			Widgets: []Widget{
-				{TextParagraph: &TextParagraph{Text: fmt.Sprintf(
-					"This document has changed since the last confirmed version. Signing is paused until %s confirms the changes.",
-					ownerName)}},
+				{DecoratedText: &DecoratedText{
+					StartIcon:   matIcon("hourglass_empty"),
+					Text:        fmt.Sprintf("Waiting for %s to sign off first", ownerName),
+					BottomLabel: "You'll be able to sign once they do.",
+					WrapText:    true,
+				}},
+			},
+		})
+	case current.Status == "pending":
+		sections = append(sections, Section{
+			Widgets: []Widget{
 				{ButtonList: &ButtonList{Buttons: []Button{
-					outlinedActionButton("Remind owner", "/addon/notify-owner",
+					filledActionButton("Sign this document", "/addon/sign-form",
 						Parameter{Key: "docId", Value: docID}),
 				}}},
 			},
 		})
-	} else {
-		switch current.Status {
-		case "pending":
-			sections = append(sections, Section{
-				Widgets: []Widget{
-					{ButtonList: &ButtonList{Buttons: []Button{
-						filledActionButton("Sign this document", "/addon/sign-form",
-							Parameter{Key: "docId", Value: docID}),
-					}}},
-				},
-			})
-		case "drifted":
-			widgets := []Widget{
-				{TextParagraph: &TextParagraph{Text: "The document changed since you signed. Review the changes and re-sign."}},
-			}
-			if summary != nil {
-				widgets = append(widgets, changeSummaryWidgets(*summary)...)
-				widgets = append(widgets, Widget{ButtonList: &ButtonList{Buttons: []Button{
-					linkButton("View in Google Docs", VersionHistoryURL(docID, summary.FromRevisionID, summary.ToRevisionID)),
-				}}})
-			}
-			widgets = append(widgets, Widget{ButtonList: &ButtonList{Buttons: []Button{
-				filledActionButton("Re-sign", "/addon/sign-form",
-					Parameter{Key: "docId", Value: docID}),
-			}}})
-			sections = append(sections, Section{Header: "What changed", Widgets: widgets})
+	case current.Status == "drifted":
+		widgets := []Widget{
+			{TextParagraph: &TextParagraph{Text: "The document changed since you signed. Review the changes and re-sign — no need to wait for anyone."}},
 		}
+		if summary != nil {
+			widgets = append(widgets, changeSummaryWidgets(*summary)...)
+			widgets = append(widgets, Widget{ButtonList: &ButtonList{Buttons: []Button{
+				linkButton("View in Google Docs", VersionHistoryURL(docID, summary.FromRevisionID, summary.ToRevisionID)),
+			}}})
+		}
+		widgets = append(widgets, Widget{ButtonList: &ButtonList{Buttons: []Button{
+			filledActionButton("Re-sign", "/addon/sign-form",
+				Parameter{Key: "docId", Value: docID}),
+		}}})
+		sections = append(sections, Section{Header: "What changed", Widgets: widgets})
 	}
+
+	sections = append(sections, Section{
+		Widgets: []Widget{
+			{ButtonList: &ButtonList{Buttons: []Button{
+				outlinedActionButton("Refresh", "/addon/back-to-status", Parameter{Key: "docId", Value: docID}),
+			}}},
+		},
+	})
 
 	return Card{
 		Name:     "status_signer",

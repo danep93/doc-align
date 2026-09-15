@@ -46,7 +46,7 @@ packages/addon-backend/
 
 **Returning to the status view:** `SignForm`'s Cancel, `DiffView`'s Back, and `AddSigners`'s Cancel all hit `/addon/back-to-status` — a dedicated action route sharing `resolveStatusCard` with the homepage trigger. Don't point a "back"/"cancel" button at `/addon/homepage` directly: that handler reads `docs.id` (only populated on the real trigger event, not action-callback events) and returns a bare `Card`, which is the wrong response shape for an action callback (see Critical invariants below).
 
-**Drift + re-review:** Owner reopens sidebar → lazy doc-level drift check runs (compares current `modifiedTime` against the doc's `confirmedModifiedTime`) → if changed, **everyone is locked** — no one can sign until the owner acts. Owner sees "Confirm new version", optionally adds a note, and confirms → server diffs the pinned baseline against current text using the owner's live token, stores the section-level `changeSummary` (headings + counts + note, never document text), bumps `confirmedVersion`, pins a new baseline, and emails drifted signers. Signers whose `signedVersion` is behind `confirmedVersion` see the drift summary and must re-sign; they can also nudge the owner via "Notify owner" if they spot drift before the owner does.
+**Drift + re-review:** Signing has exactly one bottleneck: nobody but the owner can sign until the owner has completed their own first sign-off. After that, every signer (owner included, on later re-signs) can sign or re-sign at any time — there is no confirm-gate blocking anyone. Each signature's staleness is tracked independently: on sidebar open (or a manual "Refresh" click — Card Service add-ons have no client-side JS or server-push, so a one-click refresh is the closest this architecture allows to auto-detection), the lazy per-signer check compares the doc's live `modifiedTime` against that signer's own `signedModifiedTime` (captured when they signed) and flips `signed` → `drifted` independently per signer. A drifted signer sees "Re-sign" immediately, no waiting on anyone. "Confirm new version" is optional, not required: the owner can click it any time to leave a note and compute a fresh, rich `changeSummary` diff for signers (and now the owner too, via a "What changed" button on their own status card) to review — but nothing about anyone's ability to sign depends on this ever running.
 
 **Drift check is lazy** — only runs on sidebar open, no background jobs. Post-MVP: replace `modifiedTime` comparison with Claude Haiku classification to ignore cosmetic edits.
 
@@ -84,7 +84,7 @@ documents/{docId}
   title, ownerId, baselineRevisionId, confirmedVersion, confirmedModifiedTime, changeSummary {note, sections[], totalAdded, totalRemoved, fromRevisionId, toRevisionId}, createdAt
 
 documents/{docId}/signers/{email}
-  status (pending | signed | drifted), signedAt, signedVersion, commitMessage, notifiedAt
+  status (pending | signed | drifted), signedAt, signedModifiedTime, commitMessage, driftDetectedAt, notifiedAt
 
 documents/{docId}/history/{id}
   action, actorEmail, commitMessage, revisionId, timestamp
@@ -132,7 +132,7 @@ Document content is not persisted in full. Firestore stores metadata plus a smal
 ### What's left to build
 
 - **Signer flow** — StatusSigner → SignForm → Sign → back to StatusSigner (in active testing)
-- **Drift detection wiring** — done: doc-level `modifiedTime` check runs on homepage open, owner confirm via `/addon/mark-revised`, signer nudge via `/addon/notify-owner`
+- **Drift detection wiring** — done: per-signer `modifiedTime` staleness check runs on homepage open (and on manual "Refresh"), owner confirm via `/addon/mark-revised` is optional enrichment only, never a signing gate
 - **History card** — not tested
 - **Multi-user flows** — owner + signer in separate accounts
 - **Verify signers' Drive access at save-signers time** (Permissions API) — open question from spec

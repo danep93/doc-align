@@ -15,7 +15,7 @@ type SignerStatus struct {
 	NotifiedAt      time.Time
 }
 
-func StatusOwner(docTitle string, signers []SignerStatus, docID string, docChanged bool, ownerEmail string) Card {
+func StatusOwner(docTitle string, signers []SignerStatus, docID string, docChanged bool, ownerEmail string, hasChangeSummary bool) Card {
 	signed := 0
 	drifted := 0
 	pending := 0
@@ -63,7 +63,7 @@ func StatusOwner(docTitle string, signers []SignerStatus, docID string, docChang
 			label += " (you)"
 		}
 		bottom := s.Status
-		if rt := relativeTime(s.StatusAt); rt != "" {
+		if rt := relativeTime(staleTimestamp(s)); rt != "" {
 			bottom += " · " + rt
 		}
 		dt := &DecoratedText{
@@ -110,10 +110,16 @@ func StatusOwner(docTitle string, signers []SignerStatus, docID string, docChang
 			Parameter{Key: "docId", Value: docID}),
 		outlinedActionButton("History", "/addon/history",
 			Parameter{Key: "docId", Value: docID}),
+		outlinedActionButton("Refresh", "/addon/back-to-status",
+			Parameter{Key: "docId", Value: docID}),
 	}
-	// Owners can sign their own doc too. Hidden while there's unconfirmed drift —
-	// same gate everyone else's signing is already held to.
-	if !docChanged && ownerStatus != nil {
+	if hasChangeSummary {
+		bottomButtons = append(bottomButtons, outlinedActionButton("What changed", "/addon/diff",
+			Parameter{Key: "docId", Value: docID}))
+	}
+	// Owners can sign their own doc too, any time — never gated on docChanged. Doc
+	// drift is a per-signer staleness signal, not a lock on anyone's ability to sign.
+	if ownerStatus != nil {
 		switch ownerStatus.Status {
 		case "pending":
 			bottomButtons = append([]Button{filledActionButton("Sign this document", "/addon/sign-form",
@@ -131,9 +137,9 @@ func StatusOwner(docTitle string, signers []SignerStatus, docID string, docChang
 	}
 	if docChanged {
 		sections = append(sections, Section{
-			Header: "Unconfirmed changes",
+			Header: "Document changed",
 			Widgets: []Widget{
-				{TextParagraph: &TextParagraph{Text: "The document has changed since the last confirmed version. Sign-offs are paused until you confirm."}},
+				{TextParagraph: &TextParagraph{Text: "The document has changed since your last confirmed version. This doesn't block anyone from signing — stale signatures already show as drifted above. Confirming here is optional: it lets you leave a note and refreshes the detailed diff signers can see."}},
 				{TextInput: &TextInput{
 					Name:     "confirmNote",
 					Label:    "Note for signers (optional)",
@@ -158,6 +164,16 @@ func StatusOwner(docTitle string, signers []SignerStatus, docID string, docChang
 		Header:   &Header{Title: docTitle, Subtitle: subtitle},
 		Sections: sections,
 	}
+}
+
+// staleTimestamp picks the timestamp that best answers "how stale is this row": for a
+// drifted signature, that's when the drift was detected, not when they originally
+// signed.
+func staleTimestamp(s SignerStatus) time.Time {
+	if s.Status == "drifted" && !s.DriftDetectedAt.IsZero() {
+		return s.DriftDetectedAt
+	}
+	return s.StatusAt
 }
 
 func statusIconWidget(status string) *Icon {
