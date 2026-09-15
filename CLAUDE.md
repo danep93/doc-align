@@ -42,7 +42,7 @@ packages/addon-backend/
 
 **Owner flow:** Opens sidebar → EmptyState → clicks "Create baseline" (pins current Drive revision) → AddSigners card (enters emails) → StatusOwner card showing `N signed · N drifted · N pending`.
 
-**Signer flow:** Gets email with doc link → opens sidebar → StatusSigner card → clicks "Sign this doc" → SignForm (optional commit message or quick-sign chip) → signs → status = `signed`.
+**Signer flow:** Gets email with doc link → opens sidebar → StatusSigner card → clicks "Sign this doc" → SignForm (optional commit message) → signs → status = `signed`.
 
 **Drift + re-review:** Owner reopens sidebar → lazy doc-level drift check runs (compares current `modifiedTime` against the doc's `confirmedModifiedTime`) → if changed, **everyone is locked** — no one can sign until the owner acts. Owner sees "Confirm new version", optionally adds a note, and confirms → server diffs the pinned baseline against current text using the owner's live token, stores the section-level `changeSummary` (headings + counts + note, never document text), bumps `confirmedVersion`, pins a new baseline, and emails drifted signers. Signers whose `signedVersion` is behind `confirmedVersion` see the drift summary and must re-sign; they can also nudge the owner via "Notify owner" if they spot drift before the owner does.
 
