@@ -10,7 +10,7 @@ import (
 	"github.com/doc-align/addon-backend/services"
 )
 
-// completeSign is the shared body of Sign and QuickSign. It gates on unconfirmed doc
+// completeSign is the body of Sign. It gates on unconfirmed doc
 // changes (fail closed: a Drive error here blocks signing), records the sign against
 // the doc's confirmedVersion — never a revision ID, which the Revisions API silently
 // withholds from non-owners — and re-renders the signer card.

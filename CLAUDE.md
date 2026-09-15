@@ -124,7 +124,7 @@ Document content is not persisted in full. Firestore stores metadata plus a smal
 - "Create baseline" → AddSigners card
 - AddSigners → submit → StatusOwner card with all signers listed
 - Email: sign-off request sent via Resend on `save-signers`
-- Email: owner notification sent when signer signs (Sign and QuickSign routes)
+- Email: owner notification sent when signer signs (Sign route)
 - StatusSigner card shows all signers sorted by status (drifted → pending → signed)
 
 ### What's left to build
