@@ -30,6 +30,7 @@ packages/addon-backend/
   cards/types.go               — Card Service JSON structs, BaseURL, actionButton helper
   cards/*.go                   — Card builders (one file per view)
   routes/event.go              — AddonEvent decode, writeErr/writeActionErr, resolveDocID
+  routes/status_card.go        — resolveStatusCard: single source of truth for "what does this user see right now"
   routes/*.go                  — Route handlers (one file per endpoint)
   services/firestore.go        — Firestore CRUD
   services/recent_doc.go       — Drive API fallback for doc ID (MostRecentDocID)
@@ -54,11 +55,13 @@ packages/addon-backend/
 
 | Card | Shown when |
 |---|---|
+| `ConnectDocument` | `docs.id` not yet populated — drive.file per-file access not yet granted |
 | `EmptyState` | No baseline exists |
 | `AddSigners` | After "Create baseline" clicked |
 | `StatusOwner` | Baseline exists; user is owner |
 | `StatusSigner` | Baseline exists; user is a signer |
-| `SignForm` | Signer clicks "Sign" or "Re-sign" |
+| `SignForm` | Owner or signer clicks "Sign" or "Re-sign" |
+| `DiffView` | Owner clicks "What changed", or a signer follows a stored diff link |
 | `History` | Owner clicks "History" |
 
 ### OAuth scopes

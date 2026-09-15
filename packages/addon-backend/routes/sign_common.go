@@ -33,6 +33,10 @@ func completeSign(w http.ResponseWriter, r *http.Request, store *services.Store,
 	isOwner := userEmail == doc.OwnerID
 
 	if !isOwner {
+		if _, err := store.GetSigner(ctx, docID, userEmail); err != nil {
+			writeActionErr(w, "You're not a signer on this document.")
+			return
+		}
 		ownerRec, err := store.GetSigner(ctx, docID, doc.OwnerID)
 		if err != nil || ownerRec.Status == "pending" {
 			writeActionErr(w, "The document owner needs to sign off first before anyone else can sign.")

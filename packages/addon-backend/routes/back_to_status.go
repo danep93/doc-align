@@ -9,12 +9,14 @@ import (
 )
 
 // BackToStatus is the action-callback equivalent of the homepage trigger — used by
-// "Back"/"Cancel" buttons on cards like SignForm, DiffView, and AddSigners that need to
-// return to the current status view. Homepage can't be reused directly for this: it
-// reads docs.id (only populated on the real trigger event) and returns a bare Card,
-// which action callbacks can't render (see the FormAction/RenderActions invariant in
-// CLAUDE.md). This route reads docId from the button's parameter instead, via
-// resolveDocID, and wraps the same resolveStatusCard result in cards.Push.
+// "Back"/"Cancel"/"Refresh" buttons on cards like SignForm, DiffView, AddSigners, and
+// the status cards themselves that need to return to (or refresh) the current status
+// view. Homepage can't be reused directly for this: it reads docs.id (only populated on
+// the real trigger event) and returns a bare Card, which action callbacks can't render
+// (see the FormAction/RenderActions invariant in CLAUDE.md). This route reads docId
+// from the button's parameter instead, via resolveDocID, and wraps the same
+// resolveStatusCard result in cards.Update, replacing the current card in place rather
+// than stacking a new one on top of it.
 func BackToStatus(store *services.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -29,6 +31,6 @@ func BackToStatus(store *services.Store) http.HandlerFunc {
 		docID := ev.resolveDocID()
 		userToken := ev.AuthorizationEventObject.UserOAuthToken
 
-		writeJSON(w, cards.Push(resolveStatusCard(ctx, store, userEmail, userToken, docID)))
+		writeJSON(w, cards.Update(resolveStatusCard(ctx, store, userEmail, userToken, docID)))
 	}
 }

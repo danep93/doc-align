@@ -3,6 +3,7 @@ package routes
 import (
 	"log"
 	"net/http"
+	"sort"
 
 	"github.com/doc-align/addon-backend/cards"
 	"github.com/doc-align/addon-backend/middleware"
@@ -39,6 +40,7 @@ func toSignerStatusList(m map[string]services.SignerRecord) []cards.SignerStatus
 	for email, rec := range m {
 		result = append(result, recordToStatus(email, rec))
 	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Email < result[j].Email })
 	return result
 }
 
