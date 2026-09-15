@@ -10,10 +10,13 @@ import (
 	"github.com/doc-align/addon-backend/services"
 )
 
-// completeSign is the body of Sign. It gates on unconfirmed doc
-// changes (fail closed: a Drive error here blocks signing), records the sign against
-// the doc's confirmedVersion — never a revision ID, which the Revisions API silently
-// withholds from non-owners — and re-renders the signer card.
+// completeSign is the body of Sign. The only gate on signing at all is whether the
+// document owner has completed their own first sign-off — once that's happened, every
+// signer (the owner included, on later re-signs) can sign or re-sign at any time
+// against the current document state, with no further single-person bottleneck. It
+// records the live modifiedTime at the moment of signing (used later to detect when
+// this specific signature goes stale — see services.SignersToDrift) and re-renders the
+// signer's own card.
 func completeSign(w http.ResponseWriter, r *http.Request, store *services.Store, resendKey string, ev AddonEvent, commitMsg string) {
 	ctx := r.Context()
 	userEmail := middleware.EmailFromContext(ctx)
@@ -27,22 +30,28 @@ func completeSign(w http.ResponseWriter, r *http.Request, store *services.Store,
 		return
 	}
 
+	isOwner := userEmail == doc.OwnerID
+
+	if !isOwner {
+		ownerRec, err := store.GetSigner(ctx, docID, doc.OwnerID)
+		if err != nil || ownerRec.Status == "pending" {
+			writeActionErr(w, "The document owner needs to sign off first before anyone else can sign.")
+			return
+		}
+	}
+
 	modifiedTime, err := services.FileModifiedTime(ctx, userToken, docID)
 	if err != nil {
 		log.Printf("sign: FileModifiedTime: %v", err)
 		writeActionErr(w, "Couldn't verify the document is unchanged. Please try again.")
 		return
 	}
-	if services.DocChanged(modifiedTime, doc.ConfirmedModifiedTime) {
-		writeActionErr(w, "The document has changed since the last confirmed version. The owner needs to confirm the changes before sign-offs can continue.")
-		return
-	}
 
 	now := time.Now()
 	if err := store.UpdateSignerStatus(ctx, docID, userEmail, "signed", map[string]interface{}{
-		"signedAt":      now,
-		"signedVersion": doc.ConfirmedVersion,
-		"commitMessage": commitMsg,
+		"signedAt":           now,
+		"signedModifiedTime": modifiedTime,
+		"commitMessage":      commitMsg,
 	}); err != nil {
 		log.Printf("sign: UpdateSignerStatus: %v", err)
 		writeActionErr(w, "Something went wrong. Please try again.")
@@ -56,8 +65,6 @@ func completeSign(w http.ResponseWriter, r *http.Request, store *services.Store,
 		Timestamp:     now,
 	})
 
-	isOwner := userEmail == doc.OwnerID
-
 	// Don't email the owner that they signed their own document.
 	if !isOwner {
 		go func() {
@@ -69,11 +76,11 @@ func completeSign(w http.ResponseWriter, r *http.Request, store *services.Store,
 
 	signerMap, _ := store.ListSigners(ctx, docID)
 	if isOwner {
-		writeJSON(w, cards.Push(cards.StatusOwner(doc.Title, toSignerStatusList(signerMap), docID, false, doc.OwnerID)))
+		writeJSON(w, cards.Push(cards.StatusOwner(doc.Title, toSignerStatusList(signerMap), docID, false, doc.OwnerID, doc.ChangeSummary != nil)))
 		return
 	}
 	ownerName := services.DisplayName(doc.OwnerID)
-	writeJSON(w, cards.Push(cards.StatusSigner(doc.Title, ownerName, toSignerStatusList(signerMap), userEmail, docID, false, summaryToView(doc.ChangeSummary))))
+	writeJSON(w, cards.Push(cards.StatusSigner(doc.Title, ownerName, toSignerStatusList(signerMap), userEmail, docID, true, summaryToView(doc.ChangeSummary))))
 }
 
 // summaryToView converts the stored summary to the cards-layer type (cards cannot

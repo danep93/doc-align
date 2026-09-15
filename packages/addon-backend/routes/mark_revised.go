@@ -10,12 +10,12 @@ import (
 	"github.com/doc-align/addon-backend/services"
 )
 
-// MarkRevised (route /addon/mark-revised, surfaced as "Confirm new version") is the
-// owner-only action that ends a drift episode. Using the owner's LIVE token from this
-// request — the only place document content is ever read — it diffs the pinned baseline
-// against the current text, stores the section-level summary (headings + counts + note,
-// never text), bumps confirmedVersion, pins the new baseline, and emails drifted
-// signers. This is the sole unlock path for signing.
+// MarkRevised (route /addon/mark-revised, surfaced as "Confirm new version") is an
+// optional owner action, not a gate: it diffs the pinned baseline against the current
+// text, stores the section-level summary (headings + counts + note, never text), bumps
+// confirmedVersion, pins a new baseline, and notifies anyone currently drifted that a
+// fresh note/diff is available. Nobody's ability to sign depends on this ever running —
+// that's driven entirely by the live per-signer check in services.CheckDocDrift.
 func MarkRevised(store *services.Store, resendKey string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -94,48 +94,29 @@ func MarkRevised(store *services.Store, resendKey string) http.HandlerFunc {
 			Timestamp:     now,
 		})
 
+		// Notify signers who are currently drifted that a fresh note/diff is
+		// available. Purely informational — it doesn't change anyone's ability to sign.
 		signerMap, err := store.ListSigners(ctx, docID)
 		if err != nil {
 			log.Printf("mark-revised: ListSigners: %v", err)
 			writeActionErr(w, "Something went wrong. Please try again.")
 			return
 		}
-
 		for email, rec := range signerMap {
-			if rec.Status != "drifted" && rec.Status != "signed" {
+			if rec.Status != "drifted" || email == doc.OwnerID {
 				continue
 			}
-			if rec.SignedVersion >= newVersion {
+			if err := services.SendDriftNotification(resendKey, email, userEmail, doc.Title, docID, summary); err != nil {
+				log.Printf("mark-revised: SendDriftNotification %s: %v", email, err)
 				continue
-			}
-			if rec.Status == "signed" {
-				// Signed the old version but was never flipped (never reopened the
-				// sidebar during the drift window): flip now so state is consistent.
-				if err := store.UpdateSignerStatus(ctx, docID, email, "drifted", map[string]interface{}{
-					"driftDetectedAt": now,
-				}); err != nil {
-					log.Printf("mark-revised: UpdateSignerStatus %s: %v", email, err)
-					continue
-				}
-				rec.Status = "drifted"
-				rec.DriftDetectedAt = now
-			}
-			// Don't email the owner about their own document changing — they're the
-			// one who just confirmed it.
-			if email != doc.OwnerID {
-				if err := services.SendDriftNotification(resendKey, email, userEmail, doc.Title, docID, summary); err != nil {
-					log.Printf("mark-revised: SendDriftNotification %s: %v", email, err)
-				}
 			}
 			if err := store.UpdateSignerStatus(ctx, docID, email, rec.Status, map[string]interface{}{
 				"notifiedAt": now,
 			}); err != nil {
 				log.Printf("mark-revised: UpdateSignerStatus notifiedAt %s: %v", email, err)
 			}
-			rec.NotifiedAt = now
-			signerMap[email] = rec
 		}
 
-		writeJSON(w, cards.Update(cards.StatusOwner(doc.Title, toSignerStatusList(signerMap), docID, false, doc.OwnerID)))
+		writeJSON(w, cards.Update(cards.StatusOwner(doc.Title, toSignerStatusList(signerMap), docID, false, doc.OwnerID, true)))
 	}
 }

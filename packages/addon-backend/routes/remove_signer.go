@@ -47,6 +47,6 @@ func RemoveSigner(store *services.Store) http.HandlerFunc {
 		userToken := ev.AuthorizationEventObject.UserOAuthToken
 		docChanged, signerMap := services.CheckDocDrift(ctx, store, userToken, docID, doc, signerMap)
 		signerStatuses := toSignerStatusList(signerMap)
-		writeJSON(w, cards.Update(cards.StatusOwner(doc.Title, signerStatuses, docID, docChanged, doc.OwnerID)))
+		writeJSON(w, cards.Update(cards.StatusOwner(doc.Title, signerStatuses, docID, docChanged, doc.OwnerID, doc.ChangeSummary != nil)))
 	}
 }

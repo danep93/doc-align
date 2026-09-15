@@ -40,13 +40,15 @@ func resolveStatusCard(ctx context.Context, store *services.Store, userEmail, us
 	docChanged, signerMap := services.CheckDocDrift(ctx, store, userToken, docID, doc, signerMap)
 
 	if isOwner {
-		return cards.StatusOwner(doc.Title, toSignerStatusList(signerMap), docID, docChanged, doc.OwnerID)
+		return cards.StatusOwner(doc.Title, toSignerStatusList(signerMap), docID, docChanged, doc.OwnerID, doc.ChangeSummary != nil)
 	}
 
 	if _, isSigner := signerMap[userEmail]; !isSigner {
 		return cards.EmptyState(false, docID)
 	}
 
+	ownerRec := signerMap[doc.OwnerID]
+	ownerHasSignedOnce := ownerRec.Status != "" && ownerRec.Status != "pending"
 	ownerName := services.DisplayName(doc.OwnerID)
-	return cards.StatusSigner(doc.Title, ownerName, toSignerStatusList(signerMap), userEmail, docID, docChanged, summaryToView(doc.ChangeSummary))
+	return cards.StatusSigner(doc.Title, ownerName, toSignerStatusList(signerMap), userEmail, docID, ownerHasSignedOnce, summaryToView(doc.ChangeSummary))
 }

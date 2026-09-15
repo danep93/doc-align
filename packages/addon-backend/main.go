@@ -100,7 +100,6 @@ func main() {
 	mux.Handle("POST /addon/remove-signer", protected(routes.RemoveSigner(store)))
 	mux.Handle("POST /addon/diff", protected(routes.Diff(store)))
 	mux.Handle("POST /addon/mark-revised", protected(routes.MarkRevised(store, resendKey)))
-	mux.Handle("POST /addon/notify-owner", protected(routes.NotifyOwner(store, resendKey)))
 	mux.Handle("POST /addon/history", protected(routes.History(store)))
 
 	// REST endpoints use VerifyOIDCREST — email comes from the JWT claim directly,
