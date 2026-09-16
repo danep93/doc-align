@@ -27,15 +27,11 @@ func StatusSigner(docTitle, ownerName string, signers []SignerStatus, currentUse
 		if s.DisplayName != "" {
 			label = s.DisplayName
 		}
-		bottom := s.Status
-		if rt := relativeTime(staleTimestamp(s)); rt != "" {
-			bottom += " · " + rt
-		}
 		signerWidgets = append(signerWidgets, Widget{
 			DecoratedText: &DecoratedText{
 				StartIcon:   icon,
 				Text:        label,
-				BottomLabel: bottom,
+				BottomLabel: signerBottomLabel(s),
 				WrapText:    true,
 			},
 		})
@@ -94,17 +90,12 @@ func StatusSigner(docTitle, ownerName string, signers []SignerStatus, currentUse
 		sections = append(sections, Section{Header: "What changed", Widgets: widgets})
 	}
 
-	sections = append(sections, Section{
-		Widgets: []Widget{
-			{ButtonList: &ButtonList{Buttons: []Button{
-				outlinedActionButton("Refresh", "/addon/back-to-status", Parameter{Key: "docId", Value: docID}),
-			}}},
-		},
-	})
-
 	return Card{
-		Name:     "status_signer",
-		Header:   &Header{Title: docTitle, Subtitle: fmt.Sprintf("Requested by %s", ownerName)},
+		Name:   "status_signer",
+		Header: &Header{Title: docTitle, Subtitle: fmt.Sprintf("Requested by %s", ownerName)},
+		CardActions: []CardAction{
+			cardAction("Refresh", "/addon/back-to-status", Parameter{Key: "docId", Value: docID}),
+		},
 		Sections: sections,
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"github.com/doc-align/addon-backend/cards"
 	"github.com/doc-align/addon-backend/middleware"
 	"github.com/doc-align/addon-backend/services"
@@ -56,6 +57,7 @@ func completeSign(w http.ResponseWriter, r *http.Request, store *services.Store,
 		"signedAt":           now,
 		"signedModifiedTime": modifiedTime,
 		"commitMessage":      commitMsg,
+		"signCount":          firestore.Increment(1),
 	}); err != nil {
 		log.Printf("sign: UpdateSignerStatus: %v", err)
 		writeActionErr(w, "Something went wrong. Please try again.")

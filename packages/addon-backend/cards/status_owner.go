@@ -13,6 +13,7 @@ type SignerStatus struct {
 	CommitMessage   string
 	DriftDetectedAt time.Time
 	NotifiedAt      time.Time
+	SignCount       int
 }
 
 func StatusOwner(docTitle string, signers []SignerStatus, docID string, docChanged bool, ownerEmail string, hasChangeSummary bool) Card {
@@ -62,10 +63,7 @@ func StatusOwner(docTitle string, signers []SignerStatus, docID string, docChang
 		if s.Email == ownerEmail {
 			label += " (you)"
 		}
-		bottom := s.Status
-		if rt := relativeTime(staleTimestamp(s)); rt != "" {
-			bottom += " · " + rt
-		}
+		bottom := signerBottomLabel(s)
 		dt := &DecoratedText{
 			StartIcon:   icon,
 			Text:        label,
@@ -110,8 +108,6 @@ func StatusOwner(docTitle string, signers []SignerStatus, docID string, docChang
 			Parameter{Key: "docId", Value: docID}),
 		outlinedActionButton("History", "/addon/history",
 			Parameter{Key: "docId", Value: docID}),
-		outlinedActionButton("Refresh", "/addon/back-to-status",
-			Parameter{Key: "docId", Value: docID}),
 	}
 	if hasChangeSummary {
 		bottomButtons = append(bottomButtons, outlinedActionButton("What changed", "/addon/diff",
@@ -135,34 +131,29 @@ func StatusOwner(docTitle string, signers []SignerStatus, docID string, docChang
 			Widgets: signerWidgets,
 		},
 	}
-	if docChanged {
-		sections = append(sections, Section{
-			Header: "Document changed",
-			Widgets: []Widget{
-				{TextParagraph: &TextParagraph{Text: "The document has changed since your last confirmed version. This doesn't block anyone from signing — stale signatures already show as drifted above. Confirming here is optional: it lets you leave a note and refreshes the detailed diff signers can see."}},
-				{TextInput: &TextInput{
-					Name:     "confirmNote",
-					Label:    "Note for signers (optional)",
-					HintText: "What changed and why",
-					Type:     "MULTIPLE_LINE",
-				}},
-				{ButtonList: &ButtonList{Buttons: []Button{
-					filledActionButton("Confirm new version & notify signers",
-						"/addon/mark-revised", Parameter{Key: "docId", Value: docID}),
-				}}},
-			},
-		})
-	}
 	sections = append(sections, Section{
 		Widgets: []Widget{
 			{ButtonList: &ButtonList{Buttons: bottomButtons}},
 		},
 	})
 
+	// Refresh is always available. "Confirm new version" — optional enrichment, never
+	// a gate — only shows once there's actually something to confirm. Both live in the
+	// 3-dot menu rather than the card body: staleness is already visible per-row above,
+	// so neither needs to be a prominent, naggy banner.
+	cardActions := []CardAction{
+		cardAction("Refresh", "/addon/back-to-status", Parameter{Key: "docId", Value: docID}),
+	}
+	if docChanged {
+		cardActions = append(cardActions, cardAction("Confirm new version",
+			"/addon/confirm-version-form", Parameter{Key: "docId", Value: docID}))
+	}
+
 	return Card{
-		Name:     "status_owner",
-		Header:   &Header{Title: docTitle, Subtitle: subtitle},
-		Sections: sections,
+		Name:        "status_owner",
+		Header:      &Header{Title: docTitle, Subtitle: subtitle},
+		CardActions: cardActions,
+		Sections:    sections,
 	}
 }
 
@@ -174,6 +165,21 @@ func staleTimestamp(s SignerStatus) time.Time {
 		return s.DriftDetectedAt
 	}
 	return s.StatusAt
+}
+
+// signerBottomLabel builds the secondary line under a signer's name: status, how many
+// times they've signed (so "did I sign this once or ten times, after iterations" is
+// always visible, not just their latest status), and how long ago — using
+// drift-detection time for drifted rows rather than original-sign time.
+func signerBottomLabel(s SignerStatus) string {
+	bottom := s.Status
+	if s.Status == "signed" || s.Status == "drifted" {
+		bottom = fmt.Sprintf("%s (×%d)", s.Status, s.SignCount)
+	}
+	if rt := relativeTime(staleTimestamp(s)); rt != "" {
+		bottom += " · " + rt
+	}
+	return bottom
 }
 
 func statusIconWidget(status string) *Icon {

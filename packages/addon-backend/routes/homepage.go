@@ -52,5 +52,6 @@ func recordToStatus(email string, rec services.SignerRecord) cards.SignerStatus 
 		CommitMessage:   rec.CommitMessage,
 		DriftDetectedAt: rec.DriftDetectedAt,
 		NotifiedAt:      rec.NotifiedAt,
+		SignCount:       rec.SignCount,
 	}
 }

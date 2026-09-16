@@ -18,6 +18,15 @@ func hasButtonText(card Card, text string) bool {
 	return false
 }
 
+func hasCardAction(card Card, label string) bool {
+	for _, a := range card.CardActions {
+		if a.ActionLabel == label {
+			return true
+		}
+	}
+	return false
+}
+
 func TestStatusOwner_OwnerAppearsInListWithoutRemoveButton(t *testing.T) {
 	signers := []SignerStatus{
 		{Email: "owner@example.com", Status: "pending"},
@@ -120,10 +129,56 @@ func TestStatusOwner_ShowsWhatChangedButtonWhenSummaryExists(t *testing.T) {
 }
 
 func TestStatusOwner_ShowsRefreshButton(t *testing.T) {
+	// Refresh lives in the 3-dot menu (CardActions), not the card body — Card Service
+	// has no client-side JS or server-push, so this is the closest this architecture
+	// gets to auto-detecting changes, and it doesn't need to be a prominent body button.
 	signers := []SignerStatus{{Email: "owner@example.com", Status: "pending"}}
 	card := StatusOwner("My Doc", signers, "doc-1", false, "owner@example.com", false)
 
-	if !hasButtonText(card, "Refresh") {
-		t.Error("expected a 'Refresh' button")
+	if !hasCardAction(card, "Refresh") {
+		t.Error("expected a 'Refresh' entry in the 3-dot menu")
+	}
+}
+
+func TestStatusOwner_ConfirmNewVersionMenuActionOnlyWhenDocChanged(t *testing.T) {
+	signers := []SignerStatus{{Email: "owner@example.com", Status: "signed"}}
+
+	changed := StatusOwner("My Doc", signers, "doc-1", true, "owner@example.com", false)
+	if !hasCardAction(changed, "Confirm new version") {
+		t.Error("expected a 'Confirm new version' menu entry when the doc has changed")
+	}
+
+	unchanged := StatusOwner("My Doc", signers, "doc-1", false, "owner@example.com", false)
+	if hasCardAction(unchanged, "Confirm new version") {
+		t.Error("should not offer 'Confirm new version' when nothing has changed")
+	}
+}
+
+func TestStatusOwner_NoDocumentChangedDisclaimerSection(t *testing.T) {
+	// Staleness is conveyed per-row (icon + "drifted" + count) — no separate banner.
+	signers := []SignerStatus{{Email: "owner@example.com", Status: "signed"}}
+	card := StatusOwner("My Doc", signers, "doc-1", true, "owner@example.com", false)
+
+	for _, sec := range card.Sections {
+		if sec.Header == "Document changed" {
+			t.Error("the 'Document changed' disclaimer section should no longer exist")
+		}
+	}
+}
+
+func TestStatusOwner_RowShowsSignCount(t *testing.T) {
+	signers := []SignerStatus{{Email: "owner@example.com", Status: "signed", SignCount: 3}}
+	card := StatusOwner("My Doc", signers, "doc-1", false, "owner@example.com", false)
+
+	var row *DecoratedText
+	for _, sec := range card.Sections {
+		for _, w := range sec.Widgets {
+			if w.DecoratedText != nil {
+				row = w.DecoratedText
+			}
+		}
+	}
+	if row == nil || row.BottomLabel != "signed (×3)" {
+		t.Errorf("expected bottom label %q, got %+v", "signed (×3)", row)
 	}
 }

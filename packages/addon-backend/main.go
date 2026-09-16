@@ -99,6 +99,7 @@ func main() {
 	mux.Handle("POST /addon/sign", protected(routes.Sign(store, resendKey)))
 	mux.Handle("POST /addon/remove-signer", protected(routes.RemoveSigner(store)))
 	mux.Handle("POST /addon/diff", protected(routes.Diff(store)))
+	mux.Handle("POST /addon/confirm-version-form", protected(routes.ConfirmVersionForm(store)))
 	mux.Handle("POST /addon/mark-revised", protected(routes.MarkRevised(store, resendKey)))
 	mux.Handle("POST /addon/history", protected(routes.History(store)))
 

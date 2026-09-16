@@ -41,6 +41,7 @@ type SignerRecord struct {
 	CommitMessage      string    `firestore:"commitMessage"`
 	DriftDetectedAt    time.Time `firestore:"driftDetectedAt"`
 	NotifiedAt         time.Time `firestore:"notifiedAt"`
+	SignCount          int       `firestore:"signCount"`
 }
 
 type HistoryRecord struct {
