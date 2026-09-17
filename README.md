@@ -7,7 +7,7 @@ single-person bottleneck blocking anyone else from signing in the meantime.
 
 ## Demo
 
-<video src="docs/media/demo.mp4" controls width="600"></video>
+https://github.com/user-attachments/assets/6f800144-837e-43fb-8b57-f0ab22c28b28
 
 **Active surface:** a Google Docs sidebar, implemented as an HTTP Card Service add-on
 (no Apps Script, no client-side JavaScript) — see [`packages/addon-backend/`](packages/addon-backend)
