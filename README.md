@@ -1,4 +1,4 @@
-# doc-align
+![DocAlign](docs/media/wordmark.png)
 
 Google Workspace Add-on for Google Docs sign-off and alignment. Now, to guard against slowly evolving requirements
 you can all get aligned by "signing off" on a requirements doc before beginning implementation.
