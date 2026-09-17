@@ -5,6 +5,10 @@ snapshots a version and invites signers to sign off; if the doc changes after so
 signs, their signature is flagged as stale (drifted) so they know to re-review — with no
 single-person bottleneck blocking anyone else from signing in the meantime.
 
+## Demo
+
+<video src="docs/media/demo.mp4" controls width="600"></video>
+
 **Active surface:** a Google Docs sidebar, implemented as an HTTP Card Service add-on
 (no Apps Script, no client-side JavaScript) — see [`packages/addon-backend/`](packages/addon-backend)
 (Go). Everything else in this monorepo (`packages/extension`, `packages/backend`,
