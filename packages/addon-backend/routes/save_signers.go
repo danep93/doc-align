@@ -70,6 +70,6 @@ func SaveSigners(store *services.Store, resendKey string) http.HandlerFunc {
 		userToken := ev.AuthorizationEventObject.UserOAuthToken
 		docChanged, signerMap := services.CheckDocDrift(ctx, store, userToken, docID, doc, signerMap)
 		signerStatuses := toSignerStatusList(signerMap)
-		writeJSON(w, cards.Push(cards.StatusOwner(doc.Title, signerStatuses, docID, docChanged)))
+		writeJSON(w, cards.Push(cards.StatusOwner(doc.Title, signerStatuses, docID, docChanged, doc.OwnerID, doc.ChangeSummary != nil)))
 	}
 }

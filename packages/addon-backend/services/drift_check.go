@@ -6,16 +6,20 @@ import (
 	"time"
 )
 
-// CheckDocDrift is the lazy document-level drift check run on sidebar open. It compares
-// Drive's modifiedTime (fetchable with ANY user's drive.file token — no Revisions API,
-// which silently returns nothing for non-owners) against the modifiedTime captured at
-// the owner's last confirm. Signers invalidated by the change are flipped to "drifted"
-// in Firestore and in the returned map.
+// CheckDocDrift is the lazy per-signer staleness check run on sidebar open (and after
+// any sign/status action). It fetches Drive's live modifiedTime once (fetchable with
+// ANY user's drive.file token — no Revisions API, which silently returns nothing for
+// non-owners) and flips any "signed" signer whose own SignedModifiedTime predates it to
+// "drifted" in Firestore and in the returned map — independently of every other signer.
 //
-// Returns docChanged: true means the doc has edits the owner has not yet confirmed, and
-// callers must lock all signing until the owner confirms. Fetch failures fail open for
-// display (docChanged=false, log only) — the sign routes re-check at sign time and fail
-// closed there.
+// The returned docChanged bool is unrelated to signer state: it's purely the document
+// owner's "your last confirmed diff may be stale" nudge (DocChanged against
+// doc.ConfirmedModifiedTime), used only to suggest — never require — re-confirming.
+// Nothing here blocks anyone's ability to sign; that's enforced (or not) in
+// completeSign, which only gates on whether the document owner has signed at least once.
+//
+// Fetch failures fail open for display (docChanged=false, log only, signers untouched):
+// the sign route (completeSign) re-fetches modifiedTime itself and fails closed there.
 func CheckDocDrift(ctx context.Context, store *Store, userToken, docID string, doc *DocRecord, signers map[string]SignerRecord) (bool, map[string]SignerRecord) {
 	modifiedTime, err := FileModifiedTime(ctx, userToken, docID)
 	if err != nil {
@@ -25,7 +29,7 @@ func CheckDocDrift(ctx context.Context, store *Store, userToken, docID string, d
 
 	docChanged := DocChanged(modifiedTime, doc.ConfirmedModifiedTime)
 	now := time.Now()
-	for _, email := range SignersToDrift(docChanged, doc.ConfirmedVersion, signers) {
+	for _, email := range SignersToDrift(modifiedTime, signers) {
 		if err := store.UpdateSignerStatus(ctx, docID, email, "drifted", map[string]interface{}{
 			"driftDetectedAt": now,
 		}); err != nil {

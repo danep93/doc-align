@@ -55,6 +55,23 @@ type CardAction struct {
 	OnClick     OnClick `json:"onClick"`
 }
 
+// cardAction builds a 3-dot-menu entry, mirroring actionButton's relative-path handling.
+func cardAction(label, function string, params ...Parameter) CardAction {
+	fn := function
+	if len(fn) > 0 && fn[0] == '/' {
+		fn = BaseURL + fn
+	}
+	return CardAction{
+		ActionLabel: label,
+		OnClick: OnClick{
+			Action: &FormAction{
+				Function:   fn,
+				Parameters: params,
+			},
+		},
+	}
+}
+
 type Header struct {
 	Title    string `json:"title"`
 	Subtitle string `json:"subtitle,omitempty"`

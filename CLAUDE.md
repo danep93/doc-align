@@ -1,6 +1,8 @@
 # doc-align
 
-Privacy-first Google Workspace Add-on for Google Docs sign-off and alignment. A document owner snapshots a version and requests sign-offs; signers commit to that version; if the doc changes after sign-off, signers are notified and must re-review.
+Google Workspace Add-on for Google Docs sign-off and alignment. A document owner snapshots a version and requests sign-offs; signers commit to that version; if the doc changes after sign-off, signers are notified and must re-review.
+
+**Note on "privacy-first":** earlier versions of this doc framed doc-align as privacy-first above all else. As of 2026-09-01, hitting product goals takes priority over that framing — transient LLM-based analysis of fetched doc content (e.g. for coaching/classification) is acceptable and should not be avoided on privacy grounds alone. Full document text is still never persisted, but **extracted/derived content will need to be stored going forward** — e.g. the section-level `changeSummary` already stores headings and counts, and later, whatever baseline fields get carried into a converted Linear project so that drift can be tracked against them (comparing what the Linear project turned into versus what the doc originally said, to surface inaccuracy or scope drift). Don't assume "never store anything derived from doc content" — the constraint is against storing full raw document text, not against storing the specific fields a feature is built to track.
 
 **What it is NOT:** not an approval gate (sign-off is tracked, not enforced), not a diff renderer (uses Google's native version history), not a Chrome extension.
 
@@ -28,6 +30,7 @@ packages/addon-backend/
   cards/types.go               — Card Service JSON structs, BaseURL, actionButton helper
   cards/*.go                   — Card builders (one file per view)
   routes/event.go              — AddonEvent decode, writeErr/writeActionErr, resolveDocID
+  routes/status_card.go        — resolveStatusCard: single source of truth for "what does this user see right now"
   routes/*.go                  — Route handlers (one file per endpoint)
   services/firestore.go        — Firestore CRUD
   services/recent_doc.go       — Drive API fallback for doc ID (MostRecentDocID)
@@ -38,11 +41,13 @@ packages/addon-backend/
 
 ### Core user flows
 
-**Owner flow:** Opens sidebar → EmptyState → clicks "Create baseline" (pins current Drive revision) → AddSigners card (enters emails) → StatusOwner card showing `N signed · N drifted · N pending`.
+**Owner flow:** Opens sidebar → EmptyState → clicks "Create baseline" (pins current Drive revision) → AddSigners card (enters emails) → StatusOwner card showing `N signed · N drifted · N pending`. The owner is added as a signer on their own doc too (a `pending` signer record created alongside the doc record on first baseline creation) — they appear in the same signer list as everyone they invite, with a "Sign this document" / "Re-sign" button on StatusOwner itself, using the same SignForm/Sign flow as any other signer.
 
-**Signer flow:** Gets email with doc link → opens sidebar → StatusSigner card → clicks "Sign this doc" → SignForm (optional commit message or quick-sign chip) → signs → status = `signed`.
+**Signer flow:** Gets email with doc link → opens sidebar → StatusSigner card → clicks "Sign this doc" → SignForm (optional commit message) → signs → status = `signed`. Same flow for the owner signing their own doc, except signing routes back to StatusOwner instead of StatusSigner.
 
-**Drift + re-review:** Owner reopens sidebar → lazy doc-level drift check runs (compares current `modifiedTime` against the doc's `confirmedModifiedTime`) → if changed, **everyone is locked** — no one can sign until the owner acts. Owner sees "Confirm new version", optionally adds a note, and confirms → server diffs the pinned baseline against current text using the owner's live token, stores the section-level `changeSummary` (headings + counts + note, never document text), bumps `confirmedVersion`, pins a new baseline, and emails drifted signers. Signers whose `signedVersion` is behind `confirmedVersion` see the drift summary and must re-sign; they can also nudge the owner via "Notify owner" if they spot drift before the owner does.
+**Returning to the status view:** `SignForm`'s Cancel, `DiffView`'s Back, and `AddSigners`'s Cancel all hit `/addon/back-to-status` — a dedicated action route sharing `resolveStatusCard` with the homepage trigger. Don't point a "back"/"cancel" button at `/addon/homepage` directly: that handler reads `docs.id` (only populated on the real trigger event, not action-callback events) and returns a bare `Card`, which is the wrong response shape for an action callback (see Critical invariants below).
+
+**Drift + re-review:** Signing has exactly one bottleneck: nobody but the owner can sign until the owner has completed their own first sign-off. After that, every signer (owner included, on later re-signs) can sign or re-sign at any time — there is no confirm-gate blocking anyone. Each signature's staleness is tracked independently: on sidebar open (or a manual "Refresh" click — Card Service add-ons have no client-side JS or server-push, so a one-click refresh is the closest this architecture allows to auto-detection), the lazy per-signer check compares the doc's live `modifiedTime` against that signer's own `signedModifiedTime` (captured when they signed) and flips `signed` → `drifted` independently per signer. A drifted signer sees "Re-sign" immediately, no waiting on anyone. "Confirm new version" is optional, not required: the owner can click it any time to leave a note and compute a fresh, rich `changeSummary` diff for signers (and now the owner too, via a "What changed" button on their own status card) to review — but nothing about anyone's ability to sign depends on this ever running.
 
 **Drift check is lazy** — only runs on sidebar open, no background jobs. Post-MVP: replace `modifiedTime` comparison with Claude Haiku classification to ignore cosmetic edits.
 
@@ -50,11 +55,13 @@ packages/addon-backend/
 
 | Card | Shown when |
 |---|---|
+| `ConnectDocument` | `docs.id` not yet populated — drive.file per-file access not yet granted |
 | `EmptyState` | No baseline exists |
 | `AddSigners` | After "Create baseline" clicked |
 | `StatusOwner` | Baseline exists; user is owner |
 | `StatusSigner` | Baseline exists; user is a signer |
-| `SignForm` | Signer clicks "Sign" or "Re-sign" |
+| `SignForm` | Owner or signer clicks "Sign" or "Re-sign" |
+| `DiffView` | Owner clicks "What changed", or a signer follows a stored diff link |
 | `History` | Owner clicks "History" |
 
 ### OAuth scopes
@@ -80,13 +87,13 @@ documents/{docId}
   title, ownerId, baselineRevisionId, confirmedVersion, confirmedModifiedTime, changeSummary {note, sections[], totalAdded, totalRemoved, fromRevisionId, toRevisionId}, createdAt
 
 documents/{docId}/signers/{email}
-  status (pending | signed | drifted), signedAt, signedVersion, commitMessage, notifiedAt
+  status (pending | signed | drifted), signedAt, signedModifiedTime, commitMessage, driftDetectedAt, notifiedAt
 
 documents/{docId}/history/{id}
   action, actorEmail, commitMessage, revisionId, timestamp
 ```
 
-Document content is **never stored**. Only revision IDs and metadata.
+Document content is not persisted in full. Firestore stores metadata plus a small set of intentionally-extracted fields: the section-level `changeSummary` (headings + counts + note). See the privacy-first note above.
 
 ### Critical invariants
 
@@ -122,13 +129,13 @@ Document content is **never stored**. Only revision IDs and metadata.
 - "Create baseline" → AddSigners card
 - AddSigners → submit → StatusOwner card with all signers listed
 - Email: sign-off request sent via Resend on `save-signers`
-- Email: owner notification sent when signer signs (Sign and QuickSign routes)
+- Email: owner notification sent when signer signs (Sign route)
 - StatusSigner card shows all signers sorted by status (drifted → pending → signed)
 
 ### What's left to build
 
 - **Signer flow** — StatusSigner → SignForm → Sign → back to StatusSigner (in active testing)
-- **Drift detection wiring** — done: doc-level `modifiedTime` check runs on homepage open, owner confirm via `/addon/mark-revised`, signer nudge via `/addon/notify-owner`
+- **Drift detection wiring** — done: per-signer `modifiedTime` staleness check runs on homepage open (and on manual "Refresh"), owner confirm via `/addon/mark-revised` is optional enrichment only, never a signing gate
 - **History card** — not tested
 - **Multi-user flows** — owner + signer in separate accounts
 - **Verify signers' Drive access at save-signers time** (Permissions API) — open question from spec

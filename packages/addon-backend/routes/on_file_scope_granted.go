@@ -7,15 +7,12 @@ import (
 	"github.com/doc-align/addon-backend/cards"
 	"github.com/doc-align/addon-backend/middleware"
 	"github.com/doc-align/addon-backend/services"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // OnFileScopeGranted handles the onFileScopeGrantedTrigger, which fires after the user
-// grants drive.file access for the current document.
-// In production: docs.id is populated — show the correct card.
-// Fallback: when docs.id is absent, pop to root so the homepage re-fires; with the scope
-// now granted, addonHasFileScopePermission=true and docs.id will be correctly populated.
+// grants drive.file access for the current document. Shares resolveStatusCard with
+// Homepage — the only difference is this fires from an action-style trigger, so the
+// result needs cards.Push wrapping.
 func OnFileScopeGranted(store *services.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -31,46 +28,6 @@ func OnFileScopeGranted(store *services.Store) http.HandlerFunc {
 		userToken := ev.AuthorizationEventObject.UserOAuthToken
 		log.Printf("on-file-scope-granted: docs.id=%q user=%s", docID, userEmail)
 
-		if docID == "" {
-			// docs.id still absent after scope grant — show connect card to retry.
-			log.Printf("on-file-scope-granted: docs.id empty after scope grant — showing connect card")
-			writeJSON(w, cards.Push(cards.ConnectDocument()))
-			return
-		}
-
-		doc, err := store.GetDoc(ctx, docID)
-		if err != nil {
-			if status.Code(err) == codes.NotFound {
-				writeJSON(w, cards.Push(cards.EmptyState(true, docID)))
-				return
-			}
-			log.Printf("on-file-scope-granted: GetDoc %s: %v", docID, err)
-			writeActionErr(w, "Something went wrong. Please try again.")
-			return
-		}
-
-		isOwner := doc.OwnerID == userEmail
-
-		signerMap, err := store.ListSigners(ctx, docID)
-		if err != nil {
-			log.Printf("on-file-scope-granted: ListSigners: %v", err)
-			writeActionErr(w, "Something went wrong. Please try again.")
-			return
-		}
-
-		docChanged, signerMap := services.CheckDocDrift(ctx, store, userToken, docID, doc, signerMap)
-
-		if isOwner {
-			writeJSON(w, cards.Push(cards.StatusOwner(doc.Title, toSignerStatusList(signerMap), docID, docChanged)))
-			return
-		}
-
-		if _, exists := signerMap[userEmail]; !exists {
-			writeJSON(w, cards.Push(cards.EmptyState(false, docID)))
-			return
-		}
-
-		ownerName := services.DisplayName(doc.OwnerID)
-		writeJSON(w, cards.Push(cards.StatusSigner(doc.Title, ownerName, toSignerStatusList(signerMap), userEmail, docID, docChanged, summaryToView(doc.ChangeSummary))))
+		writeJSON(w, cards.Push(resolveStatusCard(ctx, store, userEmail, userToken, docID)))
 	}
 }

@@ -37,6 +37,7 @@ func AddSigners(collaborators []Collaborator, docID string) Card {
 			ButtonList: &ButtonList{Buttons: []Button{
 				filledActionButton("Send review requests", "/addon/save-signers",
 					Parameter{Key: "docId", Value: docID}),
+				outlinedActionButton("Cancel", "/addon/back-to-status", Parameter{Key: "docId", Value: docID}),
 			}},
 		})
 	} else {
@@ -52,7 +53,10 @@ func AddSigners(collaborators []Collaborator, docID string) Card {
 			Parameter{Key: "docId", Value: docID})
 		b.Disabled = true
 		widgets = append(widgets, Widget{
-			ButtonList: &ButtonList{Buttons: []Button{b}},
+			ButtonList: &ButtonList{Buttons: []Button{
+				b,
+				outlinedActionButton("Back", "/addon/back-to-status", Parameter{Key: "docId", Value: docID}),
+			}},
 		})
 	}
 

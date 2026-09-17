@@ -84,6 +84,17 @@ func CreateBaseline(store *services.Store) http.HandlerFunc {
 			Timestamp:  time.Now(),
 		})
 
+		// Add the owner as a signer too, so they can sign off on their own doc
+		// alongside everyone they invite. Gate on whether the owner already HAS a
+		// signer record (not on whether the doc record is new) — this heals
+		// documents baselined before this feature existed the next time "Create
+		// baseline" runs, and still never resets an owner who has already signed.
+		if _, err := store.GetSigner(ctx, docID, userEmail); err != nil && isNotFound(err) {
+			if err := store.SetSigner(ctx, docID, userEmail, services.SignerRecord{Status: "pending"}); err != nil {
+				log.Printf("create-baseline: SetSigner (owner) %s: %v (non-fatal)", userEmail, err)
+			}
+		}
+
 		// Fetch collaborators from Drive permissions, excluding the owner.
 		var collaborators []cards.Collaborator
 		if userToken != "" {

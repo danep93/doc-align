@@ -89,6 +89,7 @@ func main() {
 	}
 
 	mux.Handle("POST /addon/homepage", protected(routes.Homepage(store)))
+	mux.Handle("POST /addon/back-to-status", protected(routes.BackToStatus(store)))
 	mux.Handle("POST /addon/request-file-scope", protected(routes.RequestFileScope()))
 	mux.Handle("POST /addon/on-file-scope-granted", protected(routes.OnFileScopeGranted(store)))
 	mux.Handle("POST /addon/create-baseline", protected(routes.CreateBaseline(store)))
@@ -96,11 +97,10 @@ func main() {
 	mux.Handle("POST /addon/save-signers", protected(routes.SaveSigners(store, resendKey)))
 	mux.Handle("POST /addon/sign-form", protected(routes.SignForm(store)))
 	mux.Handle("POST /addon/sign", protected(routes.Sign(store, resendKey)))
-	mux.Handle("POST /addon/quick-sign", protected(routes.QuickSign(store, resendKey)))
 	mux.Handle("POST /addon/remove-signer", protected(routes.RemoveSigner(store)))
 	mux.Handle("POST /addon/diff", protected(routes.Diff(store)))
+	mux.Handle("POST /addon/confirm-version-form", protected(routes.ConfirmVersionForm(store)))
 	mux.Handle("POST /addon/mark-revised", protected(routes.MarkRevised(store, resendKey)))
-	mux.Handle("POST /addon/notify-owner", protected(routes.NotifyOwner(store, resendKey)))
 	mux.Handle("POST /addon/history", protected(routes.History(store)))
 
 	// REST endpoints use VerifyOIDCREST — email comes from the JWT claim directly,
