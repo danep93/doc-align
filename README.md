@@ -1,9 +1,8 @@
 # doc-align
 
-Google Workspace Add-on for Google Docs sign-off and alignment. A document owner
-snapshots a version and invites signers to sign off; if the doc changes after someone
-signs, their signature is flagged as stale (drifted) so they know to re-review — with no
-single-person bottleneck blocking anyone else from signing in the meantime.
+Google Workspace Add-on for Google Docs sign-off and alignment. Now, to guard against slowly evolving requirements
+you can all get aligned by "signing off" on a requirements doc before beginning implementation.
+If anyone changes the document afterwards, your sign-off's will show as "drifted" and require a new signature
 
 ## Demo
 
